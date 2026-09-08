@@ -918,7 +918,7 @@ function terminalVelocity(mass, cda, strecke){
 }
 
 // ---------- Draw chart ----------
-function drawChart(track, length){
+function drawChart(track, length, crossover){
   const svg = document.getElementById('chart');
   svg.innerHTML = '';
   if(track.length < 2) return;
@@ -959,6 +959,40 @@ function drawChart(track, length){
     gridLabel.setAttribute('font-size','9'); gridLabel.setAttribute('fill','#5B6058');
     gridLabel.textContent = gv+'';
     svg.appendChild(gridLabel);
+  }
+
+  // Markierung: ab hier übersteigt der Luftwiderstand (cW/CdA) den Rollwiderstand
+  if(crossover && isFinite(crossover.vCrossoverKmh) && crossover.vCrossoverKmh < maxV && crossover.vCrossoverKmh > 0){
+    const py = H-pad - (crossover.vCrossoverKmh/maxV)*(H-2*pad);
+    const hLine = document.createElementNS(ns,'line');
+    hLine.setAttribute('x1',pad); hLine.setAttribute('y1',py);
+    hLine.setAttribute('x2',W-pad); hLine.setAttribute('y2',py);
+    hLine.setAttribute('stroke','#2B6777'); hLine.setAttribute('stroke-width','1.5');
+    hLine.setAttribute('stroke-dasharray','6,3');
+    svg.appendChild(hLine);
+
+    const hLabel = document.createElementNS(ns,'text');
+    hLabel.setAttribute('x', W-pad-4); hLabel.setAttribute('y', py-4);
+    hLabel.setAttribute('font-size','9'); hLabel.setAttribute('fill','#2B6777');
+    hLabel.setAttribute('text-anchor','end');
+    hLabel.textContent = `Luftwiderstand > Rollwiderstand ab ${crossover.vCrossoverKmh.toFixed(0)} km/h`;
+    svg.appendChild(hLabel);
+
+    if(crossover.xCrossover!==null && crossover.xCrossover!==undefined){
+      const px = pad + (crossover.xCrossover/length)*(W-2*pad);
+      const vLine = document.createElementNS(ns,'line');
+      vLine.setAttribute('x1',px); vLine.setAttribute('y1',pad);
+      vLine.setAttribute('x2',px); vLine.setAttribute('y2',H-pad);
+      vLine.setAttribute('stroke','#2B6777'); vLine.setAttribute('stroke-width','1.5');
+      vLine.setAttribute('stroke-dasharray','6,3');
+      svg.appendChild(vLine);
+
+      const vLabel = document.createElementNS(ns,'text');
+      vLabel.setAttribute('x', px+4); vLabel.setAttribute('y', pad+10);
+      vLabel.setAttribute('font-size','9'); vLabel.setAttribute('fill','#2B6777');
+      vLabel.textContent = `ab ${crossover.xCrossover.toFixed(0)}m`;
+      svg.appendChild(vLabel);
+    }
   }
 
   const poly = document.createElementNS(ns,'polyline');
@@ -1044,7 +1078,13 @@ function updateAll(){
     ? 'Kurvenbremsung ist aktiv: die Simulation bremst vor engen Kurven gemäss Reifenhaftung µ und maximaler Bremsverzögerung (Tab 3) auf die zulässige Kurvengeschwindigkeit ab. Fehlerwertungen aus dem Rennreglement (6.10.10, z.B. verschobene Leitkegel/Strohballen) sind weiterhin nicht abgebildet.'
     : 'Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen. Ohne geladenes CSV-Höhenprofil mit Easting/Northing (Tab 3) bildet diese Simulation nur die reine Geradeausfahrt ab — Kurvenverhalten ist dann nicht berücksichtigt.';
 
-  drawChart(sim.track, strecke.length);
+  // Schwelle, ab der Luftwiderstand (abhängig vom cW-Wert/CdA) den Rollwiderstand übersteigt
+  const Froll = strecke.crr * mass * 9.81 * Math.cos(strecke.theta);
+  const vCrossover = cda>0 ? Math.sqrt(Froll/(0.5*strecke.rho*cda)) : Infinity; // m/s
+  let xCrossover = null;
+  for(const p of sim.track){ if(p.v >= vCrossover){ xCrossover = p.x; break; } }
+
+  drawChart(sim.track, strecke.length, {vCrossoverKmh: vCrossover*3.6, xCrossover});
 }
 
 updateAll();
