@@ -96,6 +96,17 @@
   }
   @media(max-width:760px){ .grid2{grid-template-columns:1fr;} }
 
+  /* Touch-Optimierung: Eingabefelder >=16px verhindern den automatischen Zoom in iOS Safari,
+     Buttons/Tabellenfelder bekommen grössere Trefferflächen */
+  @media(pointer:coarse){
+    table.rows input[type=text], table.rows input[type=number]{ font-size:16px; padding:8px 6px; }
+    table.rows button.del{ width:36px; height:36px; font-size:18px; }
+    .field input, .field select{ font-size:16px; padding:10px 8px; }
+    nav.tabs button{ padding:16px 14px; }
+    .addrow{ padding:12px 14px; font-size:14px; }
+    svg.chart{ height:260px; }
+  }
+
   .card{
     background:var(--paper-2);
     border:var(--line);
@@ -432,11 +443,15 @@ const cogDefaults = [
   ['Achse + Räder hinten', 5, 175],
 ];
 const cogBody = document.querySelector('#cog-table tbody');
+// Namen werden als HTML-Attribut eingefügt — escapen, damit Anführungszeichen/Sonderzeichen das Markup nicht brechen
+function escAttr(s){
+  return String(s).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 function addCogRow(name='', kg=0, pos=0, locked=false){
   const tr = document.createElement('tr');
   const nameInput = locked
-    ? `<input type="text" value="${name}" disabled title="Standardzeile — Name ist fest, damit Radstand- und Reglement-Berechnung zuverlässig funktionieren.">`
-    : `<input type="text" value="${name}">`;
+    ? `<input type="text" value="${escAttr(name)}" disabled title="Standardzeile — Name ist fest, damit Radstand- und Reglement-Berechnung zuverlässig funktionieren.">`
+    : `<input type="text" value="${escAttr(name)}">`;
   const delBtn = locked
     ? `<button class="del" disabled style="opacity:0.25;cursor:default;" title="Standardzeile kann nicht gelöscht werden">×</button>`
     : `<button class="del">×</button>`;
@@ -503,7 +518,7 @@ const cwBody = document.querySelector('#cw-table tbody');
 function addCwRow(name='', cw=1.0, area=0.05){
   const tr = document.createElement('tr');
   tr.innerHTML = `
-    <td><input type="text" value="${name}"></td>
+    <td><input type="text" value="${escAttr(name)}"></td>
     <td><input type="number" value="${cw}" step="0.05"></td>
     <td><input type="number" value="${area}" step="0.01"></td>
     <td><button class="del">×</button></td>`;
@@ -578,9 +593,18 @@ function parseGPX(text){
 }
 
 // Swisstopo profile.csv-Export: "Distance;Altitude;Easting;Northing;Longitude;Latitude"
+// Trennzeichen Semikolon oder Komma werden automatisch erkannt (dezimaler Punkt bleibt .)
+function detectDelimiter(headerLine){
+  if(headerLine.includes(';')) return ';';
+  if(headerLine.includes(',')) return ',';
+  return /\t/.test(headerLine) ? '\t' : null;
+}
+
 function parseProfileCSV(text, fileName){
   const lines = text.trim().split(/\r?\n/);
-  const header = lines[0].split(';').map(h=>h.trim().toLowerCase());
+  const delim = detectDelimiter(lines[0]);
+  if(!delim) throw new Error('CSV-Trennzeichen nicht erkannt (erwartet ; oder , in der Kopfzeile).');
+  const header = lines[0].split(delim).map(h=>h.trim().toLowerCase());
   const distIdx = header.indexOf('distance');
   const altIdx = header.indexOf('altitude');
   const eastIdx = header.indexOf('easting');
@@ -589,7 +613,7 @@ function parseProfileCSV(text, fileName){
   const raw = [];
   for(let i=1;i<lines.length;i++){
     if(!lines[i].trim()) continue;
-    const cols = lines[i].split(';');
+    const cols = lines[i].split(delim);
     const dist = parseFloat(cols[distIdx]);
     const alt = parseFloat(cols[altIdx]);
     const e = eastIdx>-1 ? parseFloat(cols[eastIdx]) : NaN;
@@ -630,7 +654,13 @@ function getSavedTracks(){
 function saveTrack(name, data){
   const tracks = getSavedTracks();
   tracks[name] = data;
-  try{ localStorage.setItem(TRACK_STORAGE_KEY, JSON.stringify(tracks)); }catch(e){ /* Speicher evtl. voll/deaktiviert */ }
+  try{ localStorage.setItem(TRACK_STORAGE_KEY, JSON.stringify(tracks)); }
+  catch(e){
+    // Speicher voll oder deaktiviert (z.B. Privat-Modus) — Nutzer sichtbar warnen statt still verlieren
+    document.getElementById('track-status').textContent =
+      'Warnung: Strecke konnte nicht im Browser-Speicher gesichert werden (localStorage voll oder deaktiviert). ' +
+      'Die Strecke ist für diese Sitzung geladen — nutze den Export-Button, um sie dauerhaft zu sichern.';
+  }
   refreshTrackSelect(name);
 }
 
@@ -639,10 +669,9 @@ function refreshTrackSelect(selectName){
   const tracks = getSavedTracks();
   const names = Object.keys(tracks);
   sel.innerHTML = '<option value="">— keine gespeicherten Strecken —</option>' +
-    names.map(n=>`<option value="${n}">${n}</option>`).join('');
-  if(names.length===0){
-    sel.innerHTML = '<option value="">— keine gespeicherten Strecken —</option>';
-  } else if(selectName){
+    names.map(n=>`<option value="${escAttr(n)}">${escAttr(n)}</option>`).join('') +
+    '<option value="__reset">— Strecke zurücksetzen (konstantes Gefälle) —</option>';
+  if(selectName){
     sel.value = selectName;
   }
 }
@@ -706,7 +735,7 @@ document.getElementById('track-file').addEventListener('change', (ev)=>{
       const text = reader.result;
       const lowerName = file.name.toLowerCase();
       let data;
-      if(lowerName.endsWith('.csv') || text.trim().toLowerCase().startsWith('distance;')){
+      if(lowerName.endsWith('.csv') || /^distance\s*[;,]/i.test(text.trim())){
         const parsed = parseProfileCSV(text, file.name);
         data = {name: parsed.name, profile: parsed.profile};
       } else {
@@ -730,6 +759,24 @@ document.getElementById('track-file').addEventListener('change', (ev)=>{
 document.getElementById('track-select').addEventListener('change', (ev)=>{
   const name = ev.target.value;
   if(!name) return;
+  if(name === '__reset'){
+    // Zurück zu konstantem Gefälle mit Standardwerten — Profil verwerfen
+    applyingTrack = true;
+    currentProfile = null;
+    document.getElementById('track-name').textContent = '–';
+    document.getElementById('track-points').textContent = '–';
+    document.getElementById('track-length').textContent = '–';
+    document.getElementById('track-mode').textContent = 'Konstantes Gefälle (nur Start-/Endhöhe)';
+    document.getElementById('track-curve').textContent = '–';
+    document.getElementById('s-length').value = 800;
+    document.getElementById('s-start-height').value = 449;
+    document.getElementById('s-end-height').value = 409;
+    document.getElementById('track-status').textContent = 'Strecke zurückgesetzt: konstantes Gefälle mit Standardwerten (800 m, 449→409 m ü.M.). Gespeicherte Strecken bleiben im Dropdown erhalten.';
+    applyingTrack = false;
+    ev.target.value = '';
+    updateAll();
+    return;
+  }
   const tracks = getSavedTracks();
   if(tracks[name]) applyTrackToForm(tracks[name]);
 });
@@ -905,6 +952,9 @@ function simulate(mass, cda, strecke){
     const Fnet = Fgrav - Froll - Fair;
     const a = Fnet/mass;
     v += a*dt;
+    // Hinweis: negative Geschwindigkeit wird auf 0 geklemmt — die Kiste rollt an Gegensteigungen
+    // NICHT zurück, sondern bleibt stehen (vereinfachende Annahme; für Bergab-Rennen unkritisch,
+    // da die Simulation bei v=0 stehen bleibt, bis der Zeitschritt-Limit greift).
     if(v<0) v=0;
     x += v*dt;
     if(strecke.curveLimits){
@@ -1148,7 +1198,15 @@ function drawChart(track, length, crossover){
 // ---------- Update everything ----------
 function fmt(n, d=1){ return n.toLocaleString('de-CH', {minimumFractionDigits:d, maximumFractionDigits:d}); }
 
+// Debounce: Simulation + Chart-Redraw (tausende SVG-Punkte) laufen nicht bei jedem
+// Tastendruck, sondern erst 150 ms nach der letzten Eingabe.
+let updateTimer = null;
 function updateAll(){
+  clearTimeout(updateTimer);
+  updateTimer = setTimeout(updateAllNow, 150);
+}
+
+function updateAllNow(){
   const cog = getCogData();
   document.getElementById('cog-total').textContent = fmt(cog.totalKg,1)+' kg';
   document.getElementById('cog-wheelbase').textContent = cog.wbWarning
@@ -1218,7 +1276,7 @@ function updateAll(){
   drawChart(sim.track, strecke.length, {vCrossoverKmh: vCrossover*3.6, xCrossover});
 }
 
-updateAll();
+updateAllNow();
 </script>
 </body>
 </html>
