@@ -240,26 +240,24 @@
           <tbody></tbody>
         </table>
         <button class="addrow" id="cog-add">+ Zeile hinzufügen</button>
-        <div class="field" style="margin-top:16px;">
-          <label>Radstand (Vorderachse ↔ Hinterachse) cm</label>
-          <input type="number" id="wheelbase" value="180">
-        </div>
+        <div class="note">Der Radstand wird automatisch aus der Differenz der Positionen von "Achse + Räder vorne" und "Achse + Räder hinten" berechnet — die Zeilennamen müssen dafür "Achse", "vorne" bzw. "hinten" enthalten. Werden sie umbenannt oder gelöscht, siehst du unten eine Warnung.</div>
       </div>
 
       <div class="card sticky">
         <h2>Ergebnis</h2>
-        <div class="result-label">Gesamtgewicht (inkl. Fahrer)</div>
+        <div class="result-label">Gesamtgewicht (inkl. Pilot:in)</div>
         <div class="result-big" id="cog-total">– kg</div>
+        <div class="result-row"><span>Radstand (berechnet: hinten − vorne)</span><span class="v" id="cog-wheelbase">–</span></div>
         <div class="result-row"><span>Schwerpunkt ab Vorderachse</span><span class="v" id="cog-pos">–</span></div>
         <div class="result-row"><span>Gewichtsverteilung vorne / hinten</span><span class="v" id="cog-split">–</span></div>
         <div class="barwrap"><div class="bar" id="cog-bar" style="width:50%"></div></div>
         <div class="note">Faustregel: 55–60% Gewicht auf der Hinterachse gilt bei vielen Seifenkisten als guter Kompromiss aus Geradeauslauf und Lenkbarkeit. Zu viel Gewicht vorne macht die Lenkung träge, zu viel hinten begünstigt Übersteuern.</div>
 
         <h2 style="margin-top:20px;">Reglement-Check (IG Seifenkisten Derby CH, Ausg. 2026)</h2>
-        <div class="result-row"><span>Kisten-Gewicht ohne Fahrer</span><span class="v" id="reg-kiste-gewicht">–</span></div>
+        <div class="result-row"><span>Kisten-Gewicht ohne Pilot:in</span><span class="v" id="reg-kiste-gewicht">–</span></div>
         <div class="result-row"><span>Limite Baureglement 4.2.2</span><span class="v">65.0 kg</span></div>
         <div class="result-row"><span>Zeitstrafe gemäss 6.10.8 (0.1s/kg, max 1s)</span><span class="v" id="reg-strafe">–</span></div>
-        <div class="note" id="reg-note">Fahrer-Gewicht wird aus der Zeile "Fahrer" entnommen; alle anderen Zeilen zählen zum Kisten-Gewicht.</div>
+        <div class="note" id="reg-note">Pilot:in-Gewicht wird aus der Zeile "Pilot:in" entnommen; alle anderen Zeilen zählen zum Kisten-Gewicht.</div>
       </div>
     </div>
   </div>
@@ -275,7 +273,7 @@
         </table>
         <button class="addrow" id="cw-add">+ Zeile hinzufügen</button>
         <div class="note">
-          Richtwerte (Erfahrung, keine Messung): Fahrer aufrecht/offen ≈ 0.9–1.1 · Fahrer liegend ≈ 0.6–0.8 ·
+          Richtwerte (Erfahrung, keine Messung): Pilot:in aufrecht/offen ≈ 0.9–1.1 · Pilot:in liegend ≈ 0.6–0.8 ·
           45°-Brett-Nase ≈ 1.0–1.2 · saubere Stromlinien-Nase ≈ 0.2–0.3 · offenes Rad ≈ 0.9–1.2 (kleine Fläche) ·
           voll verkleidete Karosserie gesamt ≈ 0.3–0.5.
         </div>
@@ -299,10 +297,11 @@
       <div class="card">
         <h2>Streckenprofil</h2>
         <div class="fieldrow">
-          <div class="field"><label>Streckenlänge (m)</label><input type="number" id="s-length" value="300"></div>
-          <div class="field"><label>Mittleres Gefälle (%)</label><input type="number" id="s-slope" value="10"></div>
+          <div class="field"><label>Streckenlänge (m)</label><input type="number" id="s-length" value="800"></div>
+          <div class="field"><label>Starthöhe (m ü.M.)</label><input type="number" id="s-start-height" value="449"></div>
         </div>
         <div class="fieldrow">
+          <div class="field"><label>Zielhöhe (m ü.M.)</label><input type="number" id="s-end-height" value="409"></div>
           <div class="field">
             <label>Rollwiderstand Crr</label>
             <select id="s-crr">
@@ -311,21 +310,22 @@
               <option value="0.008">Rauer Belag / kalte Lager (0.008)</option>
             </select>
           </div>
-          <div class="field"><label>Wind (m/s, + = Gegenwind)</label><input type="number" id="s-wind" value="0" step="0.5"></div>
         </div>
         <div class="fieldrow">
+          <div class="field"><label>Wind (m/s, + = Gegenwind)</label><input type="number" id="s-wind" value="0" step="0.5"></div>
           <div class="field"><label>Lufttemperatur (°C)</label><input type="number" id="s-temp" value="15"></div>
-          <div class="field"><label>Höhe ü. M. (m)</label><input type="number" id="s-alt" value="450"></div>
         </div>
-        <div class="note">Die Luftdichte wird aus Temperatur und Höhe geschätzt (vereinfachtes Modell) und fliesst direkt in die Simulation auf Tab 4 ein.</div>
+        <div class="note">Gefälle und mittlere Höhe (für die Luftdichte) werden automatisch aus Start-/Zielhöhe und Streckenlänge berechnet — siehe "Abgeleitete Werte" rechts. Das setzt eine konstante, gleichmässige Steigung voraus; bei einem gekrümmten Streckenprofil (steiler Start, flacherer Auslauf) ist das eine Vereinfachung.</div>
         <div class="note">Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen (Fehlerwertung: 0.5s bei verschobenem Leitkegel, 10s bei verschobenem Strohballen oder ausgelassenem Tor). Diese Simulation bildet nur die reine Geradeausfahrt ab — Kurvenverhalten und Agilität sind hier nicht abgebildet, können aber im Rennen mehr Zeit kosten als der reine Aero-/Gewichtsvorteil einbringt.</div>
       </div>
 
       <div class="card sticky">
         <h2>Abgeleitete Werte</h2>
-        <div class="result-row"><span>Luftdichte ρ</span><span class="v" id="s-rho">–</span></div>
-        <div class="result-row"><span>Hangwinkel θ</span><span class="v" id="s-theta">–</span></div>
         <div class="result-row"><span>Höhenunterschied Start–Ziel</span><span class="v" id="s-height">–</span></div>
+        <div class="result-row"><span>Berechnetes Gefälle</span><span class="v" id="s-slope-calc">–</span></div>
+        <div class="result-row"><span>Hangwinkel θ</span><span class="v" id="s-theta">–</span></div>
+        <div class="result-row"><span>Mittlere Höhe (für Luftdichte)</span><span class="v" id="s-alt-calc">–</span></div>
+        <div class="result-row"><span>Luftdichte ρ</span><span class="v" id="s-rho">–</span></div>
       </div>
     </div>
   </div>
@@ -374,27 +374,36 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 
 // ---------- Tab 1: Schwerpunkt ----------
 const cogDefaults = [
-  ['Kiste (ohne Fahrer/Ballast/Achsen)', 20, 90],
-  ['Fahrer', 35, 100],
-  ['Ballast', 0, 150],
   ['Achse + Räder vorne', 5, 0],
+  ['Bodenplatte (Siebdruck 19mm gem. Reglement 4.2.3)', 10.3, 80],
+  ['Karosserie vorne (Nase + Lenkung)', 12, 20],
+  ['Karosserie Seitenteile (über ganze Länge)', 11.7, 90],
+  ['Pilot:in', 35, 100],
+  ['Ballast', 0, 150],
+  ['Karosserie hinten (Bremse + Seitenteile)', 8, 155],
   ['Achse + Räder hinten', 5, 175],
 ];
 const cogBody = document.querySelector('#cog-table tbody');
-function addCogRow(name='', kg=0, pos=0){
+function addCogRow(name='', kg=0, pos=0, locked=false){
   const tr = document.createElement('tr');
+  const nameInput = locked
+    ? `<input type="text" value="${name}" disabled title="Standardzeile — Name ist fest, damit Radstand- und Reglement-Berechnung zuverlässig funktionieren.">`
+    : `<input type="text" value="${name}">`;
+  const delBtn = locked
+    ? `<button class="del" disabled style="opacity:0.25;cursor:default;" title="Standardzeile kann nicht gelöscht werden">×</button>`
+    : `<button class="del">×</button>`;
   tr.innerHTML = `
-    <td><input type="text" value="${name}"></td>
+    <td>${nameInput}</td>
     <td><input type="number" value="${kg}" step="0.5"></td>
     <td><input type="number" value="${pos}" step="1"></td>
-    <td><button class="del">×</button></td>`;
+    <td>${delBtn}</td>`;
+  if(locked) tr.style.background = 'var(--paper)';
   tr.querySelectorAll('input').forEach(i=>i.addEventListener('input', updateAll));
-  tr.querySelector('.del').addEventListener('click', ()=>{ tr.remove(); updateAll(); });
+  if(!locked) tr.querySelector('.del').addEventListener('click', ()=>{ tr.remove(); updateAll(); });
   cogBody.appendChild(tr);
 }
-cogDefaults.forEach(r=>addCogRow(...r));
-document.getElementById('cog-add').addEventListener('click', ()=>{ addCogRow('Neu', 0, 0); });
-document.getElementById('wheelbase').addEventListener('input', updateAll);
+cogDefaults.forEach(r=>addCogRow(...r, true));
+document.getElementById('cog-add').addEventListener('click', ()=>{ addCogRow('Neu', 0, 0, false); });
 
 function getCogData(){
   const rows = [...cogBody.querySelectorAll('tr')].map(tr=>{
@@ -404,16 +413,28 @@ function getCogData(){
   const totalKg = rows.reduce((s,r)=>s+r.kg,0);
   const moment = rows.reduce((s,r)=>s+r.kg*r.pos,0);
   const cogPos = totalKg>0 ? moment/totalKg : 0;
-  const wb = parseFloat(document.getElementById('wheelbase').value)||1;
+
+  // Radstand aus den Achs-Zeilen ableiten (Namen müssen "achse" + "vorne"/"hinten" enthalten)
+  const isAchse = r => r.name.toLowerCase().includes('achse');
+  const achseVorne = rows.find(r => isAchse(r) && r.name.toLowerCase().includes('vorne'));
+  const achseHinten = rows.find(r => isAchse(r) && r.name.toLowerCase().includes('hinten'));
+  let wb, wbWarning = false;
+  if(achseVorne && achseHinten && achseHinten.pos > achseVorne.pos){
+    wb = achseHinten.pos - achseVorne.pos;
+  } else {
+    wb = 180; // Fallback-Wert
+    wbWarning = true;
+  }
+
   const frontPct = totalKg>0 ? (1 - cogPos/wb)*100 : 50;
   const rearPct = 100-frontPct;
 
-  // Reglement 4.2.2 / 6.10.8: "Fahrer" zählt nicht zum Kisten-Gewichtslimit von 65 kg
-  const fahrerRow = rows.find(r => r.name.trim().toLowerCase().startsWith('fahrer'));
+  // Reglement 4.2.2 / 6.10.8: "Pilot:in" zählt nicht zum Kisten-Gewichtslimit von 65 kg
+  const fahrerRow = rows.find(r => r.name.trim().toLowerCase().startsWith('pilot'));
   const fahrerKg = fahrerRow ? fahrerRow.kg : 0;
   const kisteKg = totalKg - fahrerKg;
 
-  return {totalKg, cogPos, wb, frontPct, rearPct, fahrerKg, kisteKg};
+  return {totalKg, cogPos, wb, wbWarning, frontPct, rearPct, fahrerKg, kisteKg};
 }
 
 function weightPenaltySeconds(kisteKg){
@@ -425,7 +446,7 @@ function weightPenaltySeconds(kisteKg){
 
 // ---------- Tab 2: cW-Wert ----------
 const cwDefaults = [
-  ['Fahrer mit Helm', 1.0, 0.25],
+  ['Pilot:in mit Helm', 1.0, 0.25],
   ['Kiste / Nase', 1.1, 0.10],
   ['Achsen', 1.2, 0.02],
   ['Räder (4x)', 1.0, 0.03],
@@ -458,7 +479,7 @@ function getCwData(){
 }
 
 // ---------- Tab 3: Strecke ----------
-['s-length','s-slope','s-crr','s-wind','s-temp','s-alt'].forEach(id=>{
+['s-length','s-start-height','s-end-height','s-crr','s-wind','s-temp'].forEach(id=>{
   document.getElementById(id).addEventListener('input', updateAll);
   document.getElementById(id).addEventListener('change', updateAll);
 });
@@ -475,15 +496,19 @@ function airDensity(tempC, altM){
 
 function getStreckeData(){
   const length = parseFloat(document.getElementById('s-length').value)||0;
-  const slopePct = parseFloat(document.getElementById('s-slope').value)||0;
+  const startHeight = parseFloat(document.getElementById('s-start-height').value)||0;
+  const endHeight = parseFloat(document.getElementById('s-end-height').value)||0;
   const crr = parseFloat(document.getElementById('s-crr').value)||0.005;
   const wind = parseFloat(document.getElementById('s-wind').value)||0;
   const temp = parseFloat(document.getElementById('s-temp').value)||15;
-  const alt = parseFloat(document.getElementById('s-alt').value)||0;
+
+  const heightDrop = startHeight - endHeight;
+  const slopePct = length>0 ? (heightDrop/length)*100 : 0;
   const theta = Math.atan(slopePct/100);
-  const rho = airDensity(temp, alt);
-  const heightDrop = length*Math.sin(theta);
-  return {length, slopePct, crr, wind, temp, alt, theta, rho, heightDrop};
+  const altMean = (startHeight+endHeight)/2;
+  const rho = airDensity(temp, altMean);
+
+  return {length, slopePct, crr, wind, temp, altMean, theta, rho, heightDrop};
 }
 
 // ---------- Simulation ----------
@@ -570,6 +595,10 @@ function fmt(n, d=1){ return n.toLocaleString('de-CH', {minimumFractionDigits:d,
 function updateAll(){
   const cog = getCogData();
   document.getElementById('cog-total').textContent = fmt(cog.totalKg,1)+' kg';
+  document.getElementById('cog-wheelbase').textContent = cog.wbWarning
+    ? `${fmt(cog.wb,0)} cm (Fallback — Achszeilen nicht eindeutig erkannt)`
+    : `${fmt(cog.wb,0)} cm`;
+  document.getElementById('cog-wheelbase').style.color = cog.wbWarning ? 'var(--accent)' : 'var(--ink)';
   document.getElementById('cog-pos').textContent = fmt(cog.cogPos,1)+' cm ab Vorderachse';
   document.getElementById('cog-split').textContent = `${fmt(cog.frontPct,0)}% / ${fmt(cog.rearPct,0)}%`;
   document.getElementById('cog-bar').style.width = Math.min(100,Math.max(0,cog.rearPct))+'%';
@@ -584,9 +613,11 @@ function updateAll(){
   document.getElementById('cw-force50').textContent = fmt(f50,1)+' N';
 
   const strecke = getStreckeData();
+  document.getElementById('s-height').textContent = fmt(strecke.heightDrop,1)+' m';
+  document.getElementById('s-slope-calc').textContent = fmt(strecke.slopePct,1)+' %';
+  document.getElementById('s-alt-calc').textContent = fmt(strecke.altMean,0)+' m ü.M.';
   document.getElementById('s-rho').textContent = fmt(strecke.rho,3)+' kg/m³';
   document.getElementById('s-theta').textContent = fmt(strecke.theta*180/Math.PI,2)+'°';
-  document.getElementById('s-height').textContent = fmt(strecke.heightDrop,1)+' m';
 
   // Reglement-Check (4.2.2 / 6.10.8)
   const penalty = weightPenaltySeconds(cog.kisteKg);
@@ -598,7 +629,7 @@ function updateAll(){
   strafeEl.style.color = penalty>0 ? 'var(--accent)' : 'var(--ok)';
   document.getElementById('reg-note').textContent = penalty>0
     ? `Kiste ist ${fmt(cog.kisteKg-65,1)} kg über dem Limit. Die Strafzeit wird auf Tab 4 automatisch zur Fahrzeit addiert.`
-    : 'Fahrer-Gewicht wird aus der Zeile "Fahrer" entnommen; alle anderen Zeilen zählen zum Kisten-Gewicht (Limite 65 kg gemäss Art. 4.2.2).';
+    : 'Pilot:in-Gewicht wird aus der Zeile "Pilot:in" entnommen; alle anderen Zeilen zählen zum Kisten-Gewicht (Limite 65 kg gemäss Art. 4.2.2).';
 
   const mass = cog.totalKg>0 ? cog.totalKg : 80;
   const cda = cw.cda>0 ? cw.cda : 0.3;
