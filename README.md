@@ -53,7 +53,7 @@ Einfach `seifenkisten-rechner.html` im Browser öffnen — keine Installation, k
 ## Roadmap / offene Punkte
 
 - [ ] Echte cW-Werte-Tabelle aus Windkanal- oder Coast-down-Messungen statt Schätzwerten
-- [ ] Variables Höhenprofil statt konstantem mittlerem Gefälle (reale Rampen sind oft am Start steiler)
+- [x] Variables Höhenprofil statt konstantem mittlerem Gefälle (reale Rampen sind oft am Start steiler) — umgesetzt via CSV-Höhenprofil-Import (Swisstopo), Simulation nutzt das lokale Gefälle pro Streckenpunkt inkl. Kurvenradien und Kurvenbremsung
 - [ ] Coast-down-Kalibrierungsmodus: aus einem realen Ausrollversuch (Distanz bis Stillstand aus bekannter Anfangsgeschwindigkeit) automatisch Crr und CdA zurückrechnen
 - [ ] Export/Import von Fahrzeug-Konfigurationen als JSON
 
