@@ -354,7 +354,7 @@
         </div>
         <div class="note">µ und Bremsverzögerung wirken nur, wenn eine CSV mit Easting/Northing geladen wurde (liefert Kurvenradien). v_max pro Kurve = √(µ·g·Radius); die Bremsverzögerung bestimmt, wie früh vor eng werdenden Kurven abgebremst werden muss. µ≈0.4–0.6 ist ein grober Richtwert für Gummireifen auf Asphalt — reale Werte hängen stark von Reifen, Fahrkönnen und Fahrwerk ab.</div>
         <div class="note">Gefälle und mittlere Höhe (für die Luftdichte) werden automatisch aus Start-/Zielhöhe und Streckenlänge berechnet — siehe "Abgeleitete Werte" rechts. Das setzt eine konstante, gleichmässige Steigung voraus; bei einem gekrümmten Streckenprofil (steiler Start, flacherer Auslauf) ist das eine Vereinfachung.</div>
-        <div class="note">Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen (Fehlerwertung: 0.5s bei verschobenem Leitkegel, 10s bei verschobenem Strohballen oder ausgelassenem Tor). Diese Simulation bildet nur die reine Geradeausfahrt ab — Kurvenverhalten und Agilität sind hier nicht abgebildet, können aber im Rennen mehr Zeit kosten als der reine Aero-/Gewichtsvorteil einbringt.</div>
+        <div class="note" id="curve-note">Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen (Fehlerwertung: 0.5s bei verschobenem Leitkegel, 10s bei verschobenem Strohballen oder ausgelassenem Tor). Ohne geladenes CSV-Höhenprofil mit Easting/Northing bildet diese Simulation nur die reine Geradeausfahrt ab — Kurvenverhalten ist dann nicht berücksichtigt.</div>
       </div>
 
       <div class="card sticky">
@@ -379,6 +379,7 @@
         <div class="result-row"><span>Theoretische Terminalgeschwindigkeit</span><span class="v" id="e-vterm">–</span></div>
         <div class="result-row"><span>Verwendete Masse</span><span class="v" id="e-mass">–</span></div>
         <div class="result-row"><span>Verwendetes CdA</span><span class="v" id="e-cda">–</span></div>
+        <div class="result-row"><span>Kurvenbremsung</span><span class="v" id="e-curve">–</span></div>
         <div class="note">Werte werden live aus Tab 1–3 übernommen. Simulation nutzt Euler-Integration (Δt = 0.02 s) über Kräfte: Hangabtrieb, Rollwiderstand, Luftwiderstand.</div>
       </div>
 
@@ -993,6 +994,14 @@ function updateAll(){
   document.getElementById('e-vterm').textContent = fmt(Math.max(vterm,0)*3.6,1)+' km/h';
   document.getElementById('e-mass').textContent = fmt(mass,1)+' kg';
   document.getElementById('e-cda').textContent = fmt(cda,3)+' m²';
+
+  const curveActive = !!strecke.curveLimits;
+  const curveEl = document.getElementById('e-curve');
+  curveEl.textContent = curveActive ? `aktiv (µ=${document.getElementById('s-mu').value}, ${document.getElementById('s-brake').value} m/s² Bremsverz.)` : 'inaktiv (kein CSV-Profil mit Kurvenradien geladen)';
+  curveEl.style.color = curveActive ? 'var(--ok)' : 'var(--ink-soft)';
+  document.getElementById('curve-note').textContent = curveActive
+    ? 'Kurvenbremsung ist aktiv: die Simulation bremst vor engen Kurven gemäss Reifenhaftung µ und maximaler Bremsverzögerung (Tab 3) auf die zulässige Kurvengeschwindigkeit ab. Fehlerwertungen aus dem Rennreglement (6.10.10, z.B. verschobene Leitkegel/Strohballen) sind weiterhin nicht abgebildet.'
+    : 'Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen. Ohne geladenes CSV-Höhenprofil mit Easting/Northing (Tab 3) bildet diese Simulation nur die reine Geradeausfahrt ab — Kurvenverhalten ist dann nicht berücksichtigt.';
 
   drawChart(sim.track, strecke.length);
 }
