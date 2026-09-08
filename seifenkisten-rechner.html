@@ -248,12 +248,18 @@
 
       <div class="card sticky">
         <h2>Ergebnis</h2>
-        <div class="result-label">Gesamtgewicht</div>
+        <div class="result-label">Gesamtgewicht (inkl. Fahrer)</div>
         <div class="result-big" id="cog-total">– kg</div>
         <div class="result-row"><span>Schwerpunkt ab Vorderachse</span><span class="v" id="cog-pos">–</span></div>
         <div class="result-row"><span>Gewichtsverteilung vorne / hinten</span><span class="v" id="cog-split">–</span></div>
         <div class="barwrap"><div class="bar" id="cog-bar" style="width:50%"></div></div>
         <div class="note">Faustregel: 55–60% Gewicht auf der Hinterachse gilt bei vielen Seifenkisten als guter Kompromiss aus Geradeauslauf und Lenkbarkeit. Zu viel Gewicht vorne macht die Lenkung träge, zu viel hinten begünstigt Übersteuern.</div>
+
+        <h2 style="margin-top:20px;">Reglement-Check (IG Seifenkisten Derby CH, Ausg. 2026)</h2>
+        <div class="result-row"><span>Kisten-Gewicht ohne Fahrer</span><span class="v" id="reg-kiste-gewicht">–</span></div>
+        <div class="result-row"><span>Limite Baureglement 4.2.2</span><span class="v">65.0 kg</span></div>
+        <div class="result-row"><span>Zeitstrafe gemäss 6.10.8 (0.1s/kg, max 1s)</span><span class="v" id="reg-strafe">–</span></div>
+        <div class="note" id="reg-note">Fahrer-Gewicht wird aus der Zeile "Fahrer" entnommen; alle anderen Zeilen zählen zum Kisten-Gewicht.</div>
       </div>
     </div>
   </div>
@@ -312,6 +318,7 @@
           <div class="field"><label>Höhe ü. M. (m)</label><input type="number" id="s-alt" value="450"></div>
         </div>
         <div class="note">Die Luftdichte wird aus Temperatur und Höhe geschätzt (vereinfachtes Modell) und fliesst direkt in die Simulation auf Tab 4 ein.</div>
+        <div class="note">Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen (Fehlerwertung: 0.5s bei verschobenem Leitkegel, 10s bei verschobenem Strohballen oder ausgelassenem Tor). Diese Simulation bildet nur die reine Geradeausfahrt ab — Kurvenverhalten und Agilität sind hier nicht abgebildet, können aber im Rennen mehr Zeit kosten als der reine Aero-/Gewichtsvorteil einbringt.</div>
       </div>
 
       <div class="card sticky">
@@ -400,7 +407,20 @@ function getCogData(){
   const wb = parseFloat(document.getElementById('wheelbase').value)||1;
   const frontPct = totalKg>0 ? (1 - cogPos/wb)*100 : 50;
   const rearPct = 100-frontPct;
-  return {totalKg, cogPos, wb, frontPct, rearPct};
+
+  // Reglement 4.2.2 / 6.10.8: "Fahrer" zählt nicht zum Kisten-Gewichtslimit von 65 kg
+  const fahrerRow = rows.find(r => r.name.trim().toLowerCase().startsWith('fahrer'));
+  const fahrerKg = fahrerRow ? fahrerRow.kg : 0;
+  const kisteKg = totalKg - fahrerKg;
+
+  return {totalKg, cogPos, wb, frontPct, rearPct, fahrerKg, kisteKg};
+}
+
+function weightPenaltySeconds(kisteKg){
+  const limit = 65;
+  if(kisteKg <= limit) return 0;
+  const overKg = Math.ceil(kisteKg - limit); // "pro angefangenes kg"
+  return Math.min(overKg, 10) * 0.1; // 6.10.8: max. 1 Sekunde
 }
 
 // ---------- Tab 2: cW-Wert ----------
@@ -568,12 +588,26 @@ function updateAll(){
   document.getElementById('s-theta').textContent = fmt(strecke.theta*180/Math.PI,2)+'°';
   document.getElementById('s-height').textContent = fmt(strecke.heightDrop,1)+' m';
 
+  // Reglement-Check (4.2.2 / 6.10.8)
+  const penalty = weightPenaltySeconds(cog.kisteKg);
+  const kisteEl = document.getElementById('reg-kiste-gewicht');
+  kisteEl.textContent = fmt(cog.kisteKg,1)+' kg';
+  kisteEl.style.color = cog.kisteKg > 65 ? 'var(--accent)' : 'var(--ok)';
+  const strafeEl = document.getElementById('reg-strafe');
+  strafeEl.textContent = penalty>0 ? '+'+fmt(penalty,1)+' s' : '0.0 s (regelkonform)';
+  strafeEl.style.color = penalty>0 ? 'var(--accent)' : 'var(--ok)';
+  document.getElementById('reg-note').textContent = penalty>0
+    ? `Kiste ist ${fmt(cog.kisteKg-65,1)} kg über dem Limit. Die Strafzeit wird auf Tab 4 automatisch zur Fahrzeit addiert.`
+    : 'Fahrer-Gewicht wird aus der Zeile "Fahrer" entnommen; alle anderen Zeilen zählen zum Kisten-Gewicht (Limite 65 kg gemäss Art. 4.2.2).';
+
   const mass = cog.totalKg>0 ? cog.totalKg : 80;
   const cda = cw.cda>0 ? cw.cda : 0.3;
   const sim = simulate(mass, cda, strecke);
   const vterm = terminalVelocity(mass, cda, strecke);
+  const totalTime = sim.t + penalty;
 
-  document.getElementById('e-time').textContent = fmt(sim.t,2)+' s';
+  document.getElementById('e-time').textContent = fmt(totalTime,2)+' s'
+    + (penalty>0 ? ` (${fmt(sim.t,2)}s + ${fmt(penalty,1)}s Strafe)` : '');
   document.getElementById('e-vfinal').textContent = fmt(sim.v*3.6,1)+' km/h';
   document.getElementById('e-vterm').textContent = fmt(Math.max(vterm,0)*3.6,1)+' km/h';
   document.getElementById('e-mass').textContent = fmt(mass,1)+' kg';
