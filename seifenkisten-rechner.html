@@ -307,6 +307,14 @@
           </div>
         </div>
         <div class="note" id="track-status">Noch keine Strecke geladen. Die reale (kurvige) Streckenlänge wird aus den Wegpunkten berechnet; Start-/Zielhöhe müssen weiterhin manuell eingetragen werden (KML-Exporte von map.geo.admin.ch enthalten meist keine Höhenwerte, GPX-Tracks mit Höhenangabe werden automatisch übernommen).</div>
+        <div class="fieldrow" style="margin-top:10px;">
+          <button class="addrow" id="track-export" style="width:100%;">↓ Alle gespeicherten Strecken als Datei exportieren</button>
+          <div class="field">
+            <label style="margin-bottom:4px;">Streckenbibliothek importieren (.json)</label>
+            <input type="file" id="track-import" accept=".json">
+          </div>
+        </div>
+        <div class="note">Strecken liegen standardmässig nur im Browser-Speicher (localStorage) — das übersteht Neustarts, aber nicht Cache-Löschen oder Geräte-/Browser-Wechsel. Der Export erzeugt eine Datei, die du sichern, per Mail verschicken oder ins Git-Repo legen kannst; der Import lädt sie auf einem beliebigen Gerät wieder ein.</div>
       </div>
       <div class="card sticky">
         <h2>Geladene Strecke</h2>
@@ -676,6 +684,43 @@ document.getElementById('track-select').addEventListener('change', (ev)=>{
 });
 
 refreshTrackSelect();
+
+document.getElementById('track-export').addEventListener('click', ()=>{
+  const tracks = getSavedTracks();
+  if(Object.keys(tracks).length===0){
+    document.getElementById('track-status').textContent = 'Keine gespeicherten Strecken zum Exportieren vorhanden.';
+    return;
+  }
+  const blob = new Blob([JSON.stringify(tracks, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'seifenkisten-strecken.json';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  document.getElementById('track-status').textContent = `${Object.keys(tracks).length} Strecke(n) exportiert nach seifenkisten-strecken.json.`;
+});
+
+document.getElementById('track-import').addEventListener('change', (ev)=>{
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const imported = JSON.parse(reader.result);
+      const existing = getSavedTracks();
+      const merged = {...existing, ...imported}; // importierte Strecken überschreiben gleichnamige bestehende
+      localStorage.setItem(TRACK_STORAGE_KEY, JSON.stringify(merged));
+      refreshTrackSelect();
+      document.getElementById('track-status').textContent = `${Object.keys(imported).length} Strecke(n) importiert. Über "Gespeicherte Strecken" auswählbar.`;
+    }catch(err){
+      document.getElementById('track-status').textContent = 'Fehler beim Import: ' + err.message;
+    }
+  };
+  reader.readAsText(file);
+});
 
 ['s-length','s-start-height','s-end-height','s-crr','s-wind','s-temp'].forEach(id=>{
   document.getElementById(id).addEventListener('input', ()=>{
