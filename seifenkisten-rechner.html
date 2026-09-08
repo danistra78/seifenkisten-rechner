@@ -1,0 +1,588 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Seifenkisten-Rechner</title>
+<style>
+  :root{
+    --paper:#F7F5EF;
+    --paper-2:#FBFAF6;
+    --ink:#1F2421;
+    --ink-soft:#5B6058;
+    --grid:#DAD5C6;
+    --accent:#C1440E;
+    --accent-2:#2B6777;
+    --ok:#4B7447;
+    --line: 1px solid var(--grid);
+    --mono: "IBM Plex Mono", "SF Mono", Consolas, monospace;
+    --sans: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:
+      linear-gradient(var(--grid) 1px, transparent 1px) 0 0/100% 28px,
+      linear-gradient(90deg, var(--grid) 1px, transparent 1px) 0 0/28px 100%,
+      var(--paper);
+    background-size: 100% 28px, 28px 100%;
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:15px;
+    line-height:1.5;
+    min-height:100vh;
+  }
+  .wrap{max-width:1080px;margin:0 auto;padding:32px 20px 80px;}
+
+  header{
+    border-bottom:2px solid var(--ink);
+    padding-bottom:16px;
+    margin-bottom:24px;
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    flex-wrap:wrap;
+    gap:8px;
+  }
+  header h1{
+    font-family:var(--mono);
+    font-size:22px;
+    font-weight:600;
+    letter-spacing:-0.02em;
+    margin:0;
+  }
+  header .sub{
+    font-size:13px;
+    color:var(--ink-soft);
+    max-width:420px;
+  }
+
+  nav.tabs{
+    display:flex;
+    border:var(--line);
+    background:var(--paper-2);
+    margin-bottom:24px;
+    overflow-x:auto;
+  }
+  nav.tabs button{
+    font-family:var(--mono);
+    font-size:13px;
+    background:none;
+    border:none;
+    border-right:var(--line);
+    padding:12px 16px;
+    cursor:pointer;
+    color:var(--ink-soft);
+    white-space:nowrap;
+    flex:1;
+    text-align:left;
+  }
+  nav.tabs button:last-child{border-right:none;}
+  nav.tabs button .n{color:var(--accent);margin-right:6px;}
+  nav.tabs button.active{
+    background:var(--ink);
+    color:var(--paper);
+  }
+  nav.tabs button.active .n{color:#E8A87C;}
+
+  .panel{display:none;}
+  .panel.active{display:block;}
+
+  .grid2{
+    display:grid;
+    grid-template-columns: 1fr 1fr;
+    gap:24px;
+    align-items:start;
+  }
+  @media(max-width:760px){ .grid2{grid-template-columns:1fr;} }
+
+  .card{
+    background:var(--paper-2);
+    border:var(--line);
+    padding:20px;
+  }
+  .card h2{
+    font-family:var(--mono);
+    font-size:14px;
+    margin:0 0 16px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--grid);
+  }
+  .card.sticky{position:sticky; top:20px;}
+
+  table.rows{width:100%; border-collapse:collapse; font-size:13px;}
+  table.rows th{
+    text-align:left;
+    font-weight:500;
+    color:var(--ink-soft);
+    font-size:11px;
+    padding:4px 6px;
+    border-bottom:1px solid var(--grid);
+  }
+  table.rows td{padding:4px 6px; vertical-align:middle;}
+  table.rows input[type=text], table.rows input[type=number]{
+    width:100%;
+    border:1px solid var(--grid);
+    background:var(--paper);
+    padding:5px 6px;
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--ink);
+  }
+  table.rows input[type=text]{font-family:var(--sans);}
+  table.rows button.del{
+    border:1px solid var(--grid);
+    background:var(--paper);
+    color:var(--ink-soft);
+    cursor:pointer;
+    width:26px;height:26px;
+    font-family:var(--mono);
+  }
+  .addrow{
+    margin-top:10px;
+    font-family:var(--mono);
+    font-size:12px;
+    background:none;
+    border:1px dashed var(--ink-soft);
+    color:var(--ink-soft);
+    padding:6px 10px;
+    cursor:pointer;
+  }
+
+  .field{margin-bottom:14px;}
+  .field label{
+    display:block;
+    font-size:12px;
+    color:var(--ink-soft);
+    margin-bottom:4px;
+  }
+  .field input, .field select{
+    width:100%;
+    border:1px solid var(--grid);
+    background:var(--paper);
+    padding:7px 8px;
+    font-family:var(--mono);
+    font-size:14px;
+    color:var(--ink);
+  }
+  .fieldrow{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
+
+  .result-big{
+    font-family:var(--mono);
+    font-size:38px;
+    color:var(--accent);
+    line-height:1.1;
+    margin:4px 0 2px;
+  }
+  .result-label{font-size:12px; color:var(--ink-soft);}
+  .result-row{
+    display:flex;
+    justify-content:space-between;
+    padding:8px 0;
+    border-bottom:1px solid var(--grid);
+    font-size:13px;
+  }
+  .result-row:last-child{border-bottom:none;}
+  .result-row .v{font-family:var(--mono); color:var(--ink);}
+
+  .barwrap{height:10px; background:var(--grid); margin-top:6px; position:relative;}
+  .bar{height:100%; background:var(--accent-2);}
+
+  svg.chart{width:100%; height:220px; background:var(--paper); border:1px solid var(--grid);}
+  .chart-legend{display:flex; gap:16px; font-size:11px; color:var(--ink-soft); margin-top:6px;}
+  .chart-legend span{display:flex; align-items:center; gap:5px;}
+  .dot{width:8px; height:8px; display:inline-block;}
+
+  footer{
+    margin-top:40px;
+    padding-top:16px;
+    border-top:1px solid var(--grid);
+    font-size:12px;
+    color:var(--ink-soft);
+  }
+  footer a{color:var(--accent-2);}
+
+  .note{
+    font-size:12px;
+    color:var(--ink-soft);
+    background:var(--paper);
+    border-left:3px solid var(--accent-2);
+    padding:8px 10px;
+    margin-top:14px;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div>
+      <h1>SEIFENKISTEN-RECHNER</h1>
+      <div class="sub">Schwerpunkt, cW-Wert und Fahrzeit-Simulation für Seifenkisten. Alle Werte sind Schätzungen — reale Messwerte ersetzen.</div>
+    </div>
+    <div class="sub" style="text-align:right;">Open-Source-Prototyp · v0.1</div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab-btn active" data-tab="cog"><span class="n">1</span>Schwerpunkt</button>
+    <button class="tab-btn" data-tab="cw"><span class="n">2</span>cW-Wert</button>
+    <button class="tab-btn" data-tab="strecke"><span class="n">3</span>Strecke</button>
+    <button class="tab-btn" data-tab="ergebnis"><span class="n">4</span>Ergebnis</button>
+  </nav>
+
+  <!-- TAB 1: SCHWERPUNKT -->
+  <div class="panel active" id="tab-cog">
+    <div class="grid2">
+      <div class="card">
+        <h2>Komponenten (Gewicht &amp; Position)</h2>
+        <table class="rows" id="cog-table">
+          <thead><tr><th>Bauteil</th><th style="width:90px">Gewicht kg</th><th style="width:110px">Abstand ab Vorderachse cm</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="addrow" id="cog-add">+ Zeile hinzufügen</button>
+        <div class="field" style="margin-top:16px;">
+          <label>Radstand (Vorderachse ↔ Hinterachse) cm</label>
+          <input type="number" id="wheelbase" value="180">
+        </div>
+      </div>
+
+      <div class="card sticky">
+        <h2>Ergebnis</h2>
+        <div class="result-label">Gesamtgewicht</div>
+        <div class="result-big" id="cog-total">– kg</div>
+        <div class="result-row"><span>Schwerpunkt ab Vorderachse</span><span class="v" id="cog-pos">–</span></div>
+        <div class="result-row"><span>Gewichtsverteilung vorne / hinten</span><span class="v" id="cog-split">–</span></div>
+        <div class="barwrap"><div class="bar" id="cog-bar" style="width:50%"></div></div>
+        <div class="note">Faustregel: 55–60% Gewicht auf der Hinterachse gilt bei vielen Seifenkisten als guter Kompromiss aus Geradeauslauf und Lenkbarkeit. Zu viel Gewicht vorne macht die Lenkung träge, zu viel hinten begünstigt Übersteuern.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 2: CW-WERT -->
+  <div class="panel" id="tab-cw">
+    <div class="grid2">
+      <div class="card">
+        <h2>Komponenten (cW-Wert &amp; Fläche)</h2>
+        <table class="rows" id="cw-table">
+          <thead><tr><th>Bauteil</th><th style="width:80px">cW</th><th style="width:90px">Fläche m²</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+        <button class="addrow" id="cw-add">+ Zeile hinzufügen</button>
+        <div class="note">
+          Richtwerte (Erfahrung, keine Messung): Fahrer aufrecht/offen ≈ 0.9–1.1 · Fahrer liegend ≈ 0.6–0.8 ·
+          45°-Brett-Nase ≈ 1.0–1.2 · saubere Stromlinien-Nase ≈ 0.2–0.3 · offenes Rad ≈ 0.9–1.2 (kleine Fläche) ·
+          voll verkleidete Karosserie gesamt ≈ 0.3–0.5.
+        </div>
+      </div>
+
+      <div class="card sticky">
+        <h2>Ergebnis</h2>
+        <div class="result-label">Gesamt-Widerstandsfläche (CdA)</div>
+        <div class="result-big" id="cw-cda">– m²</div>
+        <div class="result-row"><span>Gesamt-Stirnfläche</span><span class="v"><input type="number" id="cw-area-total" value="0.40" step="0.01" style="width:70px;font-family:var(--mono);border:1px solid var(--grid);padding:2px 4px;background:var(--paper);"> m²</span></div>
+        <div class="result-row"><span>Effektiver cW-Wert (CdA / Fläche)</span><span class="v" id="cw-eff">–</span></div>
+        <div class="result-row"><span>Luftwiderstand bei 30 km/h</span><span class="v" id="cw-force30">–</span></div>
+        <div class="result-row"><span>Luftwiderstand bei 50 km/h</span><span class="v" id="cw-force50">–</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 3: STRECKE -->
+  <div class="panel" id="tab-strecke">
+    <div class="grid2">
+      <div class="card">
+        <h2>Streckenprofil</h2>
+        <div class="fieldrow">
+          <div class="field"><label>Streckenlänge (m)</label><input type="number" id="s-length" value="300"></div>
+          <div class="field"><label>Mittleres Gefälle (%)</label><input type="number" id="s-slope" value="10"></div>
+        </div>
+        <div class="fieldrow">
+          <div class="field">
+            <label>Rollwiderstand Crr</label>
+            <select id="s-crr">
+              <option value="0.003">Glatter Asphalt, harte Räder (0.003)</option>
+              <option value="0.005" selected>Normaler Asphalt (0.005)</option>
+              <option value="0.008">Rauer Belag / kalte Lager (0.008)</option>
+            </select>
+          </div>
+          <div class="field"><label>Wind (m/s, + = Gegenwind)</label><input type="number" id="s-wind" value="0" step="0.5"></div>
+        </div>
+        <div class="fieldrow">
+          <div class="field"><label>Lufttemperatur (°C)</label><input type="number" id="s-temp" value="15"></div>
+          <div class="field"><label>Höhe ü. M. (m)</label><input type="number" id="s-alt" value="450"></div>
+        </div>
+        <div class="note">Die Luftdichte wird aus Temperatur und Höhe geschätzt (vereinfachtes Modell) und fliesst direkt in die Simulation auf Tab 4 ein.</div>
+      </div>
+
+      <div class="card sticky">
+        <h2>Abgeleitete Werte</h2>
+        <div class="result-row"><span>Luftdichte ρ</span><span class="v" id="s-rho">–</span></div>
+        <div class="result-row"><span>Hangwinkel θ</span><span class="v" id="s-theta">–</span></div>
+        <div class="result-row"><span>Höhenunterschied Start–Ziel</span><span class="v" id="s-height">–</span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- TAB 4: ERGEBNIS -->
+  <div class="panel" id="tab-ergebnis">
+    <div class="grid2">
+      <div class="card sticky">
+        <h2>Fahrzeit-Simulation</h2>
+        <div class="result-label">Fahrzeit über die Strecke</div>
+        <div class="result-big" id="e-time">– s</div>
+        <div class="result-row"><span>Zielgeschwindigkeit</span><span class="v" id="e-vfinal">–</span></div>
+        <div class="result-row"><span>Theoretische Terminalgeschwindigkeit</span><span class="v" id="e-vterm">–</span></div>
+        <div class="result-row"><span>Verwendete Masse</span><span class="v" id="e-mass">–</span></div>
+        <div class="result-row"><span>Verwendetes CdA</span><span class="v" id="e-cda">–</span></div>
+        <div class="note">Werte werden live aus Tab 1–3 übernommen. Simulation nutzt Euler-Integration (Δt = 0.02 s) über Kräfte: Hangabtrieb, Rollwiderstand, Luftwiderstand.</div>
+      </div>
+
+      <div class="card">
+        <h2>Geschwindigkeit über Distanz</h2>
+        <svg class="chart" id="chart" viewBox="0 0 600 220" preserveAspectRatio="none"></svg>
+        <div class="chart-legend">
+          <span><span class="dot" style="background:var(--accent);"></span>v (km/h)</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    Physikmodell: F = m·g·sin(θ) − Crr·m·g·cos(θ) − 0.5·ρ·CdA·v². Ohne Gewähr — für reale Rennentscheidungen echte Messwerte
+    (Rollprüfstand, Windkanal/Coast-down-Test) verwenden. Frei nutz- und erweiterbar.
+  </footer>
+
+</div>
+
+<script>
+// ---------- Tab navigation ----------
+document.querySelectorAll('.tab-btn').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('tab-'+btn.dataset.tab).classList.add('active');
+  });
+});
+
+// ---------- Tab 1: Schwerpunkt ----------
+const cogDefaults = [
+  ['Kiste (ohne Fahrer/Ballast/Achsen)', 20, 90],
+  ['Fahrer', 35, 100],
+  ['Ballast', 0, 150],
+  ['Achse + Räder vorne', 5, 0],
+  ['Achse + Räder hinten', 5, 175],
+];
+const cogBody = document.querySelector('#cog-table tbody');
+function addCogRow(name='', kg=0, pos=0){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" value="${name}"></td>
+    <td><input type="number" value="${kg}" step="0.5"></td>
+    <td><input type="number" value="${pos}" step="1"></td>
+    <td><button class="del">×</button></td>`;
+  tr.querySelectorAll('input').forEach(i=>i.addEventListener('input', updateAll));
+  tr.querySelector('.del').addEventListener('click', ()=>{ tr.remove(); updateAll(); });
+  cogBody.appendChild(tr);
+}
+cogDefaults.forEach(r=>addCogRow(...r));
+document.getElementById('cog-add').addEventListener('click', ()=>{ addCogRow('Neu', 0, 0); });
+document.getElementById('wheelbase').addEventListener('input', updateAll);
+
+function getCogData(){
+  const rows = [...cogBody.querySelectorAll('tr')].map(tr=>{
+    const inputs = tr.querySelectorAll('input');
+    return { name: inputs[0].value, kg: parseFloat(inputs[1].value)||0, pos: parseFloat(inputs[2].value)||0 };
+  });
+  const totalKg = rows.reduce((s,r)=>s+r.kg,0);
+  const moment = rows.reduce((s,r)=>s+r.kg*r.pos,0);
+  const cogPos = totalKg>0 ? moment/totalKg : 0;
+  const wb = parseFloat(document.getElementById('wheelbase').value)||1;
+  const frontPct = totalKg>0 ? (1 - cogPos/wb)*100 : 50;
+  const rearPct = 100-frontPct;
+  return {totalKg, cogPos, wb, frontPct, rearPct};
+}
+
+// ---------- Tab 2: cW-Wert ----------
+const cwDefaults = [
+  ['Fahrer mit Helm', 1.0, 0.25],
+  ['Kiste / Nase', 1.1, 0.10],
+  ['Achsen', 1.2, 0.02],
+  ['Räder (4x)', 1.0, 0.03],
+];
+const cwBody = document.querySelector('#cw-table tbody');
+function addCwRow(name='', cw=1.0, area=0.05){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td><input type="text" value="${name}"></td>
+    <td><input type="number" value="${cw}" step="0.05"></td>
+    <td><input type="number" value="${area}" step="0.01"></td>
+    <td><button class="del">×</button></td>`;
+  tr.querySelectorAll('input').forEach(i=>i.addEventListener('input', updateAll));
+  tr.querySelector('.del').addEventListener('click', ()=>{ tr.remove(); updateAll(); });
+  cwBody.appendChild(tr);
+}
+cwDefaults.forEach(r=>addCwRow(...r));
+document.getElementById('cw-add').addEventListener('click', ()=>{ addCwRow('Neu', 1.0, 0.05); });
+document.getElementById('cw-area-total').addEventListener('input', updateAll);
+
+function getCwData(){
+  const rows = [...cwBody.querySelectorAll('tr')].map(tr=>{
+    const inputs = tr.querySelectorAll('input');
+    return { name: inputs[0].value, cw: parseFloat(inputs[1].value)||0, area: parseFloat(inputs[2].value)||0 };
+  });
+  const cda = rows.reduce((s,r)=>s+r.cw*r.area,0);
+  const areaTotal = parseFloat(document.getElementById('cw-area-total').value)||0.4;
+  const cwEff = areaTotal>0 ? cda/areaTotal : 0;
+  return {cda, areaTotal, cwEff};
+}
+
+// ---------- Tab 3: Strecke ----------
+['s-length','s-slope','s-crr','s-wind','s-temp','s-alt'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateAll);
+  document.getElementById(id).addEventListener('change', updateAll);
+});
+
+function airDensity(tempC, altM){
+  // vereinfachtes Modell: Standarddruck auf Meereshöhe, barometrische Höhenformel, ideales Gas
+  const T = tempC + 273.15;
+  const p0 = 101325; // Pa
+  const L = 0.0065;  // K/m
+  const g = 9.81, M = 0.0289644, R = 8.3145;
+  const p = p0 * Math.pow(1 - (L*altM)/288.15, (g*M)/(R*L));
+  return p/(287.05*T);
+}
+
+function getStreckeData(){
+  const length = parseFloat(document.getElementById('s-length').value)||0;
+  const slopePct = parseFloat(document.getElementById('s-slope').value)||0;
+  const crr = parseFloat(document.getElementById('s-crr').value)||0.005;
+  const wind = parseFloat(document.getElementById('s-wind').value)||0;
+  const temp = parseFloat(document.getElementById('s-temp').value)||15;
+  const alt = parseFloat(document.getElementById('s-alt').value)||0;
+  const theta = Math.atan(slopePct/100);
+  const rho = airDensity(temp, alt);
+  const heightDrop = length*Math.sin(theta);
+  return {length, slopePct, crr, wind, temp, alt, theta, rho, heightDrop};
+}
+
+// ---------- Simulation ----------
+function simulate(mass, cda, strecke){
+  const g = 9.81;
+  let v = 0, x = 0, t = 0;
+  const dt = 0.02;
+  const track = [];
+  let steps = 0;
+  while(x < strecke.length && steps < 200000){
+    const Fgrav = mass*g*Math.sin(strecke.theta);
+    const Froll = strecke.crr*mass*g*Math.cos(strecke.theta);
+    const vRel = v + strecke.wind; // Gegenwind erhöht relative Anströmgeschwindigkeit
+    const Fair = 0.5*strecke.rho*cda*vRel*Math.abs(vRel);
+    const Fnet = Fgrav - Froll - Fair;
+    const a = Fnet/mass;
+    v += a*dt;
+    if(v<0) v=0;
+    x += v*dt;
+    t += dt;
+    steps++;
+    if(steps % 5 === 0) track.push({x, v});
+  }
+  return {t, v, track};
+}
+
+function terminalVelocity(mass, cda, strecke){
+  const g=9.81;
+  const num = 2*mass*g*(Math.sin(strecke.theta) - strecke.crr*Math.cos(strecke.theta));
+  const den = strecke.rho*cda;
+  if(num<=0 || den<=0) return 0;
+  return Math.sqrt(num/den) - strecke.wind;
+}
+
+// ---------- Draw chart ----------
+function drawChart(track, length){
+  const svg = document.getElementById('chart');
+  svg.innerHTML = '';
+  if(track.length < 2) return;
+  const maxV = Math.max(...track.map(p=>p.v*3.6), 1);
+  const W=600, H=220, pad=30;
+  const pts = track.map(p=>{
+    const px = pad + (p.x/length)*(W-2*pad);
+    const py = H-pad - (p.v*3.6/maxV)*(H-2*pad);
+    return `${px.toFixed(1)},${py.toFixed(1)}`;
+  }).join(' ');
+
+  const ns = 'http://www.w3.org/2000/svg';
+  // axes
+  const axis = document.createElementNS(ns,'line');
+  axis.setAttribute('x1',pad); axis.setAttribute('y1',H-pad);
+  axis.setAttribute('x2',W-pad); axis.setAttribute('y2',H-pad);
+  axis.setAttribute('stroke','#5B6058'); axis.setAttribute('stroke-width','1');
+  svg.appendChild(axis);
+  const axisY = document.createElementNS(ns,'line');
+  axisY.setAttribute('x1',pad); axisY.setAttribute('y1',pad);
+  axisY.setAttribute('x2',pad); axisY.setAttribute('y2',H-pad);
+  axisY.setAttribute('stroke','#5B6058'); axisY.setAttribute('stroke-width','1');
+  svg.appendChild(axisY);
+
+  const poly = document.createElementNS(ns,'polyline');
+  poly.setAttribute('points', pts);
+  poly.setAttribute('fill','none');
+  poly.setAttribute('stroke','#C1440E');
+  poly.setAttribute('stroke-width','2');
+  svg.appendChild(poly);
+
+  const label = document.createElementNS(ns,'text');
+  label.setAttribute('x', pad+2); label.setAttribute('y', pad-8);
+  label.setAttribute('font-size','10'); label.setAttribute('fill','#5B6058');
+  label.textContent = `${maxV.toFixed(0)} km/h`;
+  svg.appendChild(label);
+
+  const labelX = document.createElementNS(ns,'text');
+  labelX.setAttribute('x', W-pad-40); labelX.setAttribute('y', H-pad+16);
+  labelX.setAttribute('font-size','10'); labelX.setAttribute('fill','#5B6058');
+  labelX.textContent = `${length} m`;
+  svg.appendChild(labelX);
+}
+
+// ---------- Update everything ----------
+function fmt(n, d=1){ return n.toLocaleString('de-CH', {minimumFractionDigits:d, maximumFractionDigits:d}); }
+
+function updateAll(){
+  const cog = getCogData();
+  document.getElementById('cog-total').textContent = fmt(cog.totalKg,1)+' kg';
+  document.getElementById('cog-pos').textContent = fmt(cog.cogPos,1)+' cm ab Vorderachse';
+  document.getElementById('cog-split').textContent = `${fmt(cog.frontPct,0)}% / ${fmt(cog.rearPct,0)}%`;
+  document.getElementById('cog-bar').style.width = Math.min(100,Math.max(0,cog.rearPct))+'%';
+
+  const cw = getCwData();
+  document.getElementById('cw-cda').textContent = fmt(cw.cda,3)+' m²';
+  document.getElementById('cw-eff').textContent = fmt(cw.cwEff,2);
+  const rhoTmp = airDensity(15,450);
+  const f30 = 0.5*rhoTmp*cw.cda*Math.pow(30/3.6,2);
+  const f50 = 0.5*rhoTmp*cw.cda*Math.pow(50/3.6,2);
+  document.getElementById('cw-force30').textContent = fmt(f30,1)+' N';
+  document.getElementById('cw-force50').textContent = fmt(f50,1)+' N';
+
+  const strecke = getStreckeData();
+  document.getElementById('s-rho').textContent = fmt(strecke.rho,3)+' kg/m³';
+  document.getElementById('s-theta').textContent = fmt(strecke.theta*180/Math.PI,2)+'°';
+  document.getElementById('s-height').textContent = fmt(strecke.heightDrop,1)+' m';
+
+  const mass = cog.totalKg>0 ? cog.totalKg : 80;
+  const cda = cw.cda>0 ? cw.cda : 0.3;
+  const sim = simulate(mass, cda, strecke);
+  const vterm = terminalVelocity(mass, cda, strecke);
+
+  document.getElementById('e-time').textContent = fmt(sim.t,2)+' s';
+  document.getElementById('e-vfinal').textContent = fmt(sim.v*3.6,1)+' km/h';
+  document.getElementById('e-vterm').textContent = fmt(Math.max(vterm,0)*3.6,1)+' km/h';
+  document.getElementById('e-mass').textContent = fmt(mass,1)+' kg';
+  document.getElementById('e-cda').textContent = fmt(cda,3)+' m²';
+
+  drawChart(sim.track, strecke.length);
+}
+
+updateAll();
+</script>
+</body>
+</html>
