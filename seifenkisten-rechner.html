@@ -727,6 +727,29 @@ document.getElementById('track-select').addEventListener('change', (ev)=>{
 
 refreshTrackSelect();
 
+// Beim Start automatisch mitgelieferte Strecken-Bibliothek aus demselben Ordner laden (falls vorhanden).
+// Funktioniert nur bei Auslieferung über einen Webserver (z.B. GitHub Pages) — bei lokalem Öffnen der
+// Datei (file://) schlägt der Fetch aus Sicherheitsgründen fehl und wird hier stillschweigend ignoriert.
+async function loadBuiltInTracks(){
+  try{
+    const resp = await fetch('seifenkisten-strecken.json');
+    if(!resp.ok) return;
+    const fileTracks = await resp.json();
+    const existing = getSavedTracks();
+    // Lokal bereits vorhandene/veränderte Strecken haben Vorrang vor der mitgelieferten Datei
+    const merged = {...fileTracks, ...existing};
+    localStorage.setItem(TRACK_STORAGE_KEY, JSON.stringify(merged));
+    refreshTrackSelect();
+    const added = Object.keys(fileTracks).filter(n=>!(n in existing));
+    if(added.length>0){
+      document.getElementById('track-status').textContent = `${added.length} Strecke(n) aus seifenkisten-strecken.json automatisch geladen: ${added.join(', ')}.`;
+    }
+  }catch(e){
+    // Datei nicht vorhanden oder lokal ohne Webserver geöffnet — kein Fehler, einfach ignorieren
+  }
+}
+loadBuiltInTracks();
+
 document.getElementById('track-export').addEventListener('click', ()=>{
   const tracks = getSavedTracks();
   if(Object.keys(tracks).length===0){
