@@ -65,4 +65,4 @@ Alle berechneten Werte sind Näherungen eines vereinfachten physikalischen Model
 
 ## Lizenz
 
-MIT — siehe [LICENSE](LICENSE)
+GNU General Public License v3.0 — siehe [LICENSE](LICENSE)
