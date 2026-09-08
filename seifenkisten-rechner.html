@@ -322,6 +322,7 @@
         <div class="result-row"><span>Wegpunkte</span><span class="v" id="track-points">–</span></div>
         <div class="result-row"><span>Berechnete Länge</span><span class="v" id="track-length">–</span></div>
         <div class="result-row"><span>Simulationsmodus</span><span class="v" id="track-mode">Konstantes Gefälle (nur Start-/Endhöhe)</span></div>
+        <div class="result-row"><span>Schärfste Kurve</span><span class="v" id="track-curve">–</span></div>
       </div>
     </div>
 
@@ -347,6 +348,11 @@
           <div class="field"><label>Wind (m/s, + = Gegenwind)</label><input type="number" id="s-wind" value="0" step="0.5"></div>
           <div class="field"><label>Lufttemperatur (°C)</label><input type="number" id="s-temp" value="15"></div>
         </div>
+        <div class="fieldrow">
+          <div class="field"><label>Reifenhaftung µ (Kurvengrenze)</label><input type="number" id="s-mu" value="0.5" step="0.05"></div>
+          <div class="field"><label>Max. Bremsverzögerung (m/s²)</label><input type="number" id="s-brake" value="3.0" step="0.5"></div>
+        </div>
+        <div class="note">µ und Bremsverzögerung wirken nur, wenn eine CSV mit Easting/Northing geladen wurde (liefert Kurvenradien). v_max pro Kurve = √(µ·g·Radius); die Bremsverzögerung bestimmt, wie früh vor eng werdenden Kurven abgebremst werden muss. µ≈0.4–0.6 ist ein grober Richtwert für Gummireifen auf Asphalt — reale Werte hängen stark von Reifen, Fahrkönnen und Fahrwerk ab.</div>
         <div class="note">Gefälle und mittlere Höhe (für die Luftdichte) werden automatisch aus Start-/Zielhöhe und Streckenlänge berechnet — siehe "Abgeleitete Werte" rechts. Das setzt eine konstante, gleichmässige Steigung voraus; bei einem gekrümmten Streckenprofil (steiler Start, flacherer Auslauf) ist das eine Vereinfachung.</div>
         <div class="note">Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen (Fehlerwertung: 0.5s bei verschobenem Leitkegel, 10s bei verschobenem Strohballen oder ausgelassenem Tor). Diese Simulation bildet nur die reine Geradeausfahrt ab — Kurvenverhalten und Agilität sind hier nicht abgebildet, können aber im Rennen mehr Zeit kosten als der reine Aero-/Gewichtsvorteil einbringt.</div>
       </div>
@@ -567,18 +573,41 @@ function parseProfileCSV(text, fileName){
   const header = lines[0].split(';').map(h=>h.trim().toLowerCase());
   const distIdx = header.indexOf('distance');
   const altIdx = header.indexOf('altitude');
+  const eastIdx = header.indexOf('easting');
+  const northIdx = header.indexOf('northing');
   if(distIdx===-1 || altIdx===-1) throw new Error('CSV enthält keine Spalten "Distance"/"Altitude" (Swisstopo-Höhenprofil-Format erwartet).');
-  const profile = [];
+  const raw = [];
   for(let i=1;i<lines.length;i++){
     if(!lines[i].trim()) continue;
     const cols = lines[i].split(';');
     const dist = parseFloat(cols[distIdx]);
     const alt = parseFloat(cols[altIdx]);
-    if(!isNaN(dist) && !isNaN(alt)) profile.push([dist, alt]);
+    const e = eastIdx>-1 ? parseFloat(cols[eastIdx]) : NaN;
+    const n = northIdx>-1 ? parseFloat(cols[northIdx]) : NaN;
+    if(!isNaN(dist) && !isNaN(alt)) raw.push({dist, alt, e, n});
   }
-  if(profile.length < 2) throw new Error('Zu wenige gültige Zeilen im Höhenprofil.');
+  if(raw.length < 2) throw new Error('Zu wenige gültige Zeilen im Höhenprofil.');
+
+  const hasCoords = eastIdx>-1 && northIdx>-1 && raw.every(p=>!isNaN(p.e) && !isNaN(p.n));
+
+  // Kurvenradius pro Punkt via Richtungsänderung zwischen benachbarten Segmenten (3-Punkt-Methode)
+  const profile = raw.map((p,i)=>{
+    let radius = null;
+    if(hasCoords && i>0 && i<raw.length-1){
+      const p0=raw[i-1], p1=raw[i], p2=raw[i+1];
+      const b1 = Math.atan2(p1.n-p0.n, p1.e-p0.e);
+      const b2 = Math.atan2(p2.n-p1.n, p2.e-p1.e);
+      let dtheta = b2-b1;
+      while(dtheta>Math.PI) dtheta -= 2*Math.PI;
+      while(dtheta<-Math.PI) dtheta += 2*Math.PI;
+      const ds = p2.dist - p0.dist;
+      if(ds>0 && Math.abs(dtheta)>1e-6) radius = Math.abs(ds/dtheta);
+    }
+    return [p.dist, p.alt, radius];
+  });
+
   const name = fileName.replace(/\.[^.]+$/, '');
-  return {name, profile};
+  return {name, profile, hasCoords};
 }
 
 function getSavedTracks(){
@@ -625,10 +654,22 @@ function applyTrackToForm(data){
     document.getElementById('s-length').value = Math.round(total);
     document.getElementById('s-start-height').value = data.profile[0][1];
     document.getElementById('s-end-height').value = data.profile[data.profile.length-1][1];
-    document.getElementById('track-status').textContent = `Strecke "${data.name}" geladen: vollständiges Höhenprofil mit ${data.profile.length} Punkten — die Simulation nutzt jetzt das lokale Gefälle statt einem konstanten Durchschnittswert.`;
+
+    const radii = data.profile.map(p=>p[2]).filter(r=>r!==null && r!==undefined && isFinite(r));
+    if(radii.length>0){
+      const minR = Math.min(...radii);
+      const mu = parseFloat(document.getElementById('s-mu').value)||0.5;
+      const vMax = Math.sqrt(mu*9.81*minR)*3.6;
+      document.getElementById('track-curve').textContent = `${fmt(minR,1)} m (max. ~${fmt(vMax,0)} km/h bei µ=${mu})`;
+      document.getElementById('track-status').textContent = `Strecke "${data.name}" geladen: vollständiges Höhenprofil (${data.profile.length} Pkt.) inkl. Kurvenradien. Schärfste Kurve: ${fmt(minR,1)}m Radius — Simulation berücksichtigt jetzt Bremsen vor engen Kurven.`;
+    } else {
+      document.getElementById('track-curve').textContent = 'keine Koordinaten in CSV (Easting/Northing fehlen)';
+      document.getElementById('track-status').textContent = `Strecke "${data.name}" geladen: Höhenprofil mit ${data.profile.length} Punkten. Keine Easting/Northing-Spalten gefunden — Kurvenradien konnten nicht berechnet werden.`;
+    }
   } else {
     // Nur Geometrie (KML/GPX) — konstantes Gefälle aus Start-/Endhöhe
     currentProfile = null;
+    document.getElementById('track-curve').textContent = 'nicht verfügbar (nur CSV-Höhenprofile liefern Kurvenradien)';
     document.getElementById('track-points').textContent = data.coords.length + ' Punkte';
     document.getElementById('track-length').textContent = fmt(data.lengthM,1)+' m';
     document.getElementById('track-mode').textContent = 'Konstantes Gefälle (nur Start-/Endhöhe)';
@@ -722,15 +763,19 @@ document.getElementById('track-import').addEventListener('change', (ev)=>{
   reader.readAsText(file);
 });
 
-['s-length','s-start-height','s-end-height','s-crr','s-wind','s-temp'].forEach(id=>{
+['s-length','s-start-height','s-end-height'].forEach(id=>{
   document.getElementById(id).addEventListener('input', ()=>{
     if(!applyingTrack && currentProfile){
-      // Manuelle Änderung nach Profil-Import: Profil wird ungültig, zurück zu konstantem Gefälle
+      // Manuelle Änderung von Länge/Höhe nach Profil-Import: Profil wird ungültig, zurück zu konstantem Gefälle
       currentProfile = null;
       document.getElementById('track-mode').textContent = 'Konstantes Gefälle (manuell überschrieben)';
     }
     updateAll();
   });
+  document.getElementById(id).addEventListener('change', updateAll);
+});
+['s-crr','s-wind','s-temp','s-mu','s-brake'].forEach(id=>{
+  document.getElementById(id).addEventListener('input', updateAll);
   document.getElementById(id).addEventListener('change', updateAll);
 });
 
@@ -751,17 +796,41 @@ function getStreckeData(){
   const crr = parseFloat(document.getElementById('s-crr').value)||0.005;
   const wind = parseFloat(document.getElementById('s-wind').value)||0;
   const temp = parseFloat(document.getElementById('s-temp').value)||15;
+  const mu = parseFloat(document.getElementById('s-mu').value)||0.5;
+  const brakeDecel = parseFloat(document.getElementById('s-brake').value)||3.0;
 
   const heightDrop = startHeight - endHeight;
   const slopePct = length>0 ? (heightDrop/length)*100 : 0;
   const theta = Math.atan(slopePct/100); // mittleres/konstantes Gefälle — Fallback, falls kein Profil geladen
   let altMean = (startHeight+endHeight)/2;
+  let curveLimits = null;
   if(currentProfile && currentProfile.length>0){
     altMean = currentProfile.reduce((s,p)=>s+p[1],0)/currentProfile.length;
+    curveLimits = computeCurveSpeedLimits(currentProfile, mu, brakeDecel);
   }
   const rho = airDensity(temp, altMean);
 
-  return {length, slopePct, crr, wind, temp, altMean, theta, rho, heightDrop, profile: currentProfile};
+  return {length, slopePct, crr, wind, temp, altMean, theta, rho, heightDrop, profile: currentProfile, curveLimits};
+}
+
+// Kurvengeschwindigkeits-Limit pro Profilpunkt: v_max = sqrt(µ·g·R), danach Rückwärtsglättung
+// gemäss max. Bremsverzögerung, damit vor engen Kurven rechtzeitig gebremst wird (analog Racing-Line-Speedprofilen).
+function computeCurveSpeedLimits(profile, mu, brakeDecel){
+  const g = 9.81;
+  const n = profile.length;
+  const limits = new Array(n);
+  for(let i=0;i<n;i++){
+    const r = profile[i][2];
+    limits[i] = (r!==null && r!==undefined && isFinite(r) && r>0) ? Math.sqrt(mu*g*r) : Infinity;
+  }
+  for(let i=n-2;i>=0;i--){
+    const ds = profile[i+1][0]-profile[i][0];
+    if(ds>0 && isFinite(limits[i+1])){
+      const achievable = Math.sqrt(limits[i+1]*limits[i+1] + 2*brakeDecel*ds);
+      limits[i] = Math.min(limits[i], achievable);
+    }
+  }
+  return limits;
 }
 
 // ---------- Simulation ----------
@@ -775,6 +844,17 @@ function localThetaFromProfile(profile, x, fallbackTheta){
   if(dist<=0) return fallbackTheta;
   const slope = (p0[1]-p1[1])/dist; // positiv = bergab
   return Math.atan(slope);
+}
+
+function localLimitFromProfile(profile, limits, x){
+  if(!profile || !limits || profile.length<2) return Infinity;
+  let i = 0;
+  while(i < profile.length-2 && profile[i+1][0] <= x) i++;
+  const d0 = profile[i][0], d1 = profile[Math.min(i+1, profile.length-1)][0];
+  const l0 = limits[i], l1 = limits[Math.min(i+1, profile.length-1)];
+  if(d1<=d0) return l0;
+  const t = (x-d0)/(d1-d0);
+  return l0 + t*(l1-l0);
 }
 
 function simulate(mass, cda, strecke){
@@ -794,6 +874,10 @@ function simulate(mass, cda, strecke){
     v += a*dt;
     if(v<0) v=0;
     x += v*dt;
+    if(strecke.curveLimits){
+      const limit = localLimitFromProfile(strecke.profile, strecke.curveLimits, x);
+      if(v > limit) v = limit; // Bremsen vor/in der Kurve auf die zulässige Kurvengeschwindigkeit
+    }
     t += dt;
     steps++;
     if(steps % 5 === 0) track.push({x, v});
