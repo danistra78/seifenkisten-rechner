@@ -295,6 +295,30 @@
   <div class="panel" id="tab-strecke">
     <div class="grid2">
       <div class="card">
+        <h2>Strecke aus KML/GPX laden</h2>
+        <div class="fieldrow">
+          <div class="field">
+            <label>Datei hochladen (map.geo.admin.ch-Export o.ä.)</label>
+            <input type="file" id="track-file" accept=".kml,.gpx,.csv">
+          </div>
+          <div class="field">
+            <label>Gespeicherte Strecken</label>
+            <select id="track-select"><option value="">— keine gespeicherten Strecken —</option></select>
+          </div>
+        </div>
+        <div class="note" id="track-status">Noch keine Strecke geladen. Die reale (kurvige) Streckenlänge wird aus den Wegpunkten berechnet; Start-/Zielhöhe müssen weiterhin manuell eingetragen werden (KML-Exporte von map.geo.admin.ch enthalten meist keine Höhenwerte, GPX-Tracks mit Höhenangabe werden automatisch übernommen).</div>
+      </div>
+      <div class="card sticky">
+        <h2>Geladene Strecke</h2>
+        <div class="result-row"><span>Name</span><span class="v" id="track-name">–</span></div>
+        <div class="result-row"><span>Wegpunkte</span><span class="v" id="track-points">–</span></div>
+        <div class="result-row"><span>Berechnete Länge</span><span class="v" id="track-length">–</span></div>
+        <div class="result-row"><span>Simulationsmodus</span><span class="v" id="track-mode">Konstantes Gefälle (nur Start-/Endhöhe)</span></div>
+      </div>
+    </div>
+
+    <div class="grid2" style="margin-top:24px;">
+      <div class="card">
         <h2>Streckenprofil</h2>
         <div class="fieldrow">
           <div class="field"><label>Streckenlänge (m)</label><input type="number" id="s-length" value="800"></div>
@@ -479,8 +503,189 @@ function getCwData(){
 }
 
 // ---------- Tab 3: Strecke ----------
+
+// -- Track-Upload: KML/GPX parsen, reale (kurvige) Länge berechnen, in localStorage speichern --
+const TRACK_STORAGE_KEY = 'seifenkisten-tracks-v1';
+
+function haversineMeters(lon1, lat1, lon2, lat2){
+  const R = 6371000;
+  const toRad = d => d*Math.PI/180;
+  const dphi = toRad(lat2-lat1);
+  const dlambda = toRad(lon2-lon1);
+  const a = Math.sin(dphi/2)**2 + Math.cos(toRad(lat1))*Math.cos(toRad(lat2))*Math.sin(dlambda/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+
+function pathLengthMeters(coords){
+  let total = 0;
+  for(let i=0;i<coords.length-1;i++){
+    total += haversineMeters(coords[i][0], coords[i][1], coords[i+1][0], coords[i+1][1]);
+  }
+  return total;
+}
+
+function parseKML(text){
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const nameEl = doc.querySelector('name');
+  const name = nameEl ? nameEl.textContent.trim() : 'Unbenannte Strecke';
+  const coordEl = doc.querySelector('LineString coordinates, coordinates');
+  if(!coordEl) throw new Error('Keine <coordinates> in der KML gefunden.');
+  const coords = coordEl.textContent.trim().split(/\s+/).map(pair=>{
+    const parts = pair.split(',').map(Number);
+    return [parts[0], parts[1], parts[2]]; // lon, lat, ele(optional, meist undefined bei KML-Zeichnungen)
+  });
+  return {name, coords};
+}
+
+function parseGPX(text){
+  const doc = new DOMParser().parseFromString(text, 'text/xml');
+  const nameEl = doc.querySelector('trk > name, name');
+  const name = nameEl ? nameEl.textContent.trim() : 'Unbenannte Strecke';
+  const pts = [...doc.querySelectorAll('trkpt, rtept')];
+  if(pts.length === 0) throw new Error('Keine <trkpt>/<rtept> in der GPX gefunden.');
+  const coords = pts.map(pt=>{
+    const lon = parseFloat(pt.getAttribute('lon'));
+    const lat = parseFloat(pt.getAttribute('lat'));
+    const eleEl = pt.querySelector('ele');
+    const ele = eleEl ? parseFloat(eleEl.textContent) : undefined;
+    return [lon, lat, ele];
+  });
+  return {name, coords};
+}
+
+// Swisstopo profile.csv-Export: "Distance;Altitude;Easting;Northing;Longitude;Latitude"
+function parseProfileCSV(text, fileName){
+  const lines = text.trim().split(/\r?\n/);
+  const header = lines[0].split(';').map(h=>h.trim().toLowerCase());
+  const distIdx = header.indexOf('distance');
+  const altIdx = header.indexOf('altitude');
+  if(distIdx===-1 || altIdx===-1) throw new Error('CSV enthält keine Spalten "Distance"/"Altitude" (Swisstopo-Höhenprofil-Format erwartet).');
+  const profile = [];
+  for(let i=1;i<lines.length;i++){
+    if(!lines[i].trim()) continue;
+    const cols = lines[i].split(';');
+    const dist = parseFloat(cols[distIdx]);
+    const alt = parseFloat(cols[altIdx]);
+    if(!isNaN(dist) && !isNaN(alt)) profile.push([dist, alt]);
+  }
+  if(profile.length < 2) throw new Error('Zu wenige gültige Zeilen im Höhenprofil.');
+  const name = fileName.replace(/\.[^.]+$/, '');
+  return {name, profile};
+}
+
+function getSavedTracks(){
+  try{
+    const raw = localStorage.getItem(TRACK_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  }catch(e){ return {}; }
+}
+
+function saveTrack(name, data){
+  const tracks = getSavedTracks();
+  tracks[name] = data;
+  try{ localStorage.setItem(TRACK_STORAGE_KEY, JSON.stringify(tracks)); }catch(e){ /* Speicher evtl. voll/deaktiviert */ }
+  refreshTrackSelect(name);
+}
+
+function refreshTrackSelect(selectName){
+  const sel = document.getElementById('track-select');
+  const tracks = getSavedTracks();
+  const names = Object.keys(tracks);
+  sel.innerHTML = '<option value="">— keine gespeicherten Strecken —</option>' +
+    names.map(n=>`<option value="${n}">${n}</option>`).join('');
+  if(names.length===0){
+    sel.innerHTML = '<option value="">— keine gespeicherten Strecken —</option>';
+  } else if(selectName){
+    sel.value = selectName;
+  }
+}
+
+let currentProfile = null; // [[distanz_m, hoehe_m], ...] des aktuell geladenen Höhenprofils, oder null
+let applyingTrack = false;  // verhindert, dass programmatisches Befüllen der Felder das Profil sofort wieder verwirft
+
+function applyTrackToForm(data){
+  applyingTrack = true;
+  document.getElementById('track-name').textContent = data.name;
+
+  if(data.profile){
+    // Vollständiges Höhenprofil (aus CSV) — präziseste Variante
+    currentProfile = data.profile;
+    const total = data.profile[data.profile.length-1][0];
+    document.getElementById('track-points').textContent = data.profile.length + ' Höhenpunkte';
+    document.getElementById('track-length').textContent = fmt(total,1)+' m';
+    document.getElementById('track-mode').textContent = `Vollständiges Höhenprofil aktiv (${data.profile.length} Punkte)`;
+    document.getElementById('s-length').value = Math.round(total);
+    document.getElementById('s-start-height').value = data.profile[0][1];
+    document.getElementById('s-end-height').value = data.profile[data.profile.length-1][1];
+    document.getElementById('track-status').textContent = `Strecke "${data.name}" geladen: vollständiges Höhenprofil mit ${data.profile.length} Punkten — die Simulation nutzt jetzt das lokale Gefälle statt einem konstanten Durchschnittswert.`;
+  } else {
+    // Nur Geometrie (KML/GPX) — konstantes Gefälle aus Start-/Endhöhe
+    currentProfile = null;
+    document.getElementById('track-points').textContent = data.coords.length + ' Punkte';
+    document.getElementById('track-length').textContent = fmt(data.lengthM,1)+' m';
+    document.getElementById('track-mode').textContent = 'Konstantes Gefälle (nur Start-/Endhöhe)';
+    document.getElementById('s-length').value = Math.round(data.lengthM);
+    const hasEle = data.startEle!==undefined && data.startEle!==null;
+    if(hasEle){
+      document.getElementById('s-start-height').value = data.startEle;
+      document.getElementById('s-end-height').value = data.endEle;
+    }
+    document.getElementById('track-status').textContent = hasEle
+      ? `Strecke "${data.name}" geladen: Länge und Höhen automatisch übernommen (konstantes Gefälle).`
+      : `Strecke "${data.name}" geladen: Länge automatisch übernommen. Diese Datei enthält keine Höhenwerte — Start-/Zielhöhe bitte manuell prüfen (z.B. mit dem CSV-Höhenprofil-Export von map.geo.admin.ch für noch präzisere Ergebnisse).`;
+  }
+  applyingTrack = false;
+  updateAll();
+}
+
+document.getElementById('track-file').addEventListener('change', (ev)=>{
+  const file = ev.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try{
+      const text = reader.result;
+      const lowerName = file.name.toLowerCase();
+      let data;
+      if(lowerName.endsWith('.csv') || text.trim().toLowerCase().startsWith('distance;')){
+        const parsed = parseProfileCSV(text, file.name);
+        data = {name: parsed.name, profile: parsed.profile};
+      } else {
+        const isGPX = lowerName.endsWith('.gpx') || text.includes('<gpx');
+        const parsed = isGPX ? parseGPX(text) : parseKML(text);
+        if(parsed.coords.length < 2) throw new Error('Zu wenige Wegpunkte in der Datei.');
+        const lengthM = pathLengthMeters(parsed.coords);
+        const startEle = parsed.coords[0][2];
+        const endEle = parsed.coords[parsed.coords.length-1][2];
+        data = {name: parsed.name, coords: parsed.coords, lengthM, startEle, endEle};
+      }
+      saveTrack(data.name, data);
+      applyTrackToForm(data);
+    }catch(err){
+      document.getElementById('track-status').textContent = 'Fehler beim Einlesen: ' + err.message;
+    }
+  };
+  reader.readAsText(file);
+});
+
+document.getElementById('track-select').addEventListener('change', (ev)=>{
+  const name = ev.target.value;
+  if(!name) return;
+  const tracks = getSavedTracks();
+  if(tracks[name]) applyTrackToForm(tracks[name]);
+});
+
+refreshTrackSelect();
+
 ['s-length','s-start-height','s-end-height','s-crr','s-wind','s-temp'].forEach(id=>{
-  document.getElementById(id).addEventListener('input', updateAll);
+  document.getElementById(id).addEventListener('input', ()=>{
+    if(!applyingTrack && currentProfile){
+      // Manuelle Änderung nach Profil-Import: Profil wird ungültig, zurück zu konstantem Gefälle
+      currentProfile = null;
+      document.getElementById('track-mode').textContent = 'Konstantes Gefälle (manuell überschrieben)';
+    }
+    updateAll();
+  });
   document.getElementById(id).addEventListener('change', updateAll);
 });
 
@@ -504,14 +709,29 @@ function getStreckeData(){
 
   const heightDrop = startHeight - endHeight;
   const slopePct = length>0 ? (heightDrop/length)*100 : 0;
-  const theta = Math.atan(slopePct/100);
-  const altMean = (startHeight+endHeight)/2;
+  const theta = Math.atan(slopePct/100); // mittleres/konstantes Gefälle — Fallback, falls kein Profil geladen
+  let altMean = (startHeight+endHeight)/2;
+  if(currentProfile && currentProfile.length>0){
+    altMean = currentProfile.reduce((s,p)=>s+p[1],0)/currentProfile.length;
+  }
   const rho = airDensity(temp, altMean);
 
-  return {length, slopePct, crr, wind, temp, altMean, theta, rho, heightDrop};
+  return {length, slopePct, crr, wind, temp, altMean, theta, rho, heightDrop, profile: currentProfile};
 }
 
 // ---------- Simulation ----------
+function localThetaFromProfile(profile, x, fallbackTheta){
+  if(!profile || profile.length<2) return fallbackTheta;
+  // profile ist nach Distanz sortiert; einfache lineare Suche (Profile sind klein genug, <1000 Punkte)
+  let i = 0;
+  while(i < profile.length-2 && profile[i+1][0] <= x) i++;
+  const p0 = profile[i], p1 = profile[Math.min(i+1, profile.length-1)];
+  const dist = p1[0]-p0[0];
+  if(dist<=0) return fallbackTheta;
+  const slope = (p0[1]-p1[1])/dist; // positiv = bergab
+  return Math.atan(slope);
+}
+
 function simulate(mass, cda, strecke){
   const g = 9.81;
   let v = 0, x = 0, t = 0;
@@ -519,8 +739,9 @@ function simulate(mass, cda, strecke){
   const track = [];
   let steps = 0;
   while(x < strecke.length && steps < 200000){
-    const Fgrav = mass*g*Math.sin(strecke.theta);
-    const Froll = strecke.crr*mass*g*Math.cos(strecke.theta);
+    const theta = localThetaFromProfile(strecke.profile, x, strecke.theta);
+    const Fgrav = mass*g*Math.sin(theta);
+    const Froll = strecke.crr*mass*g*Math.cos(theta);
     const vRel = v + strecke.wind; // Gegenwind erhöht relative Anströmgeschwindigkeit
     const Fair = 0.5*strecke.rho*cda*vRel*Math.abs(vRel);
     const Fnet = Fgrav - Froll - Fair;
