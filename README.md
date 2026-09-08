@@ -2,7 +2,7 @@
 
 Ein Browser-Tool zur physikalischen Auslegung von Rennseifenkisten: Schwerpunkt, Luftwiderstand (cW-Wert) und Fahrzeit-Simulation auf einer beliebigen Strecke — alles live, ohne Installation.
 
-**[→ Demo öffnen](#)** *(Link einfügen, sobald via GitHub Pages gehostet)*
+**[[→ Demo öffnen](](https://git.hanwavel.ch/seifenkisten-rechner.html)#
 
 ---
 
