@@ -44,7 +44,12 @@ mit:
 | `CdA` | Widerstandsfläche = Σ (cW-Wert × Fläche) aller Bauteile |
 | `v` | Momentangeschwindigkeit |
 
-Die Simulation integriert diese Gleichung in kleinen Zeitschritten (Δt = 0.02 s) über die gesamte Streckenlänge.
+Die Simulation integriert diese Gleichung in kleinen Zeitschritten (Δt = 0.005 s) über die gesamte Streckenlänge. Zusätzlich modelliert:
+
+- **Rotierende Massen** — wirksame Trägheit `m_eff = m + f·m_Räder` (f wählbar, 1.0 für Ring/Felge); die Radmasse wird aus den Achszeilen in Tab 1 übernommen.
+- **Lokales Gefälle** — bei geladenem CSV-Höhenprofil wird θ pro Streckenpunkt interpoliert statt als konstantes Mittelgefälle gerechnet.
+- **Lokale Luftdichte** — ρ wird bei geladenem Profil aus der Höhe am jeweiligen Streckenpunkt berechnet.
+- **Kurvenbremsung** — v_max = √(µ·g·R) pro Punkt, rückwärts geglättet mit hangabhängiger Bremsverzögerung (a_eff = Bremswert − g·sin θ).
 
 ## Nutzung
 

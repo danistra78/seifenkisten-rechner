@@ -371,7 +371,19 @@
           <div class="field"><label>Reifenhaftung µ (Kurvengrenze)</label><input type="number" id="s-mu" value="0.5" step="0.05"></div>
           <div class="field"><label>Max. Bremsverzögerung (m/s²)</label><input type="number" id="s-brake" value="3.0" step="0.5"></div>
         </div>
-        <div class="note">µ und Bremsverzögerung wirken nur, wenn eine CSV mit Easting/Northing geladen wurde (liefert Kurvenradien). v_max pro Kurve = √(µ·g·Radius); die Bremsverzögerung bestimmt, wie früh vor eng werdenden Kurven abgebremst werden muss. µ≈0.4–0.6 ist ein grober Richtwert für Gummireifen auf Asphalt — reale Werte hängen stark von Reifen, Fahrkönnen und Fahrwerk ab.</div>
+        <div class="fieldrow">
+          <div class="field">
+            <label>Rad-Rotation (Trägheit)</label>
+            <select id="s-rot">
+              <option value="0">Aus — rotierende Massen ignorieren</option>
+              <option value="0.5">Vollscheibe (+0.5 × Radmasse)</option>
+              <option value="1" selected>Ring/Felge (+1.0 × Radmasse)</option>
+            </select>
+          </div>
+          <div class="field"><label>Rotierende Masse (aus Tab 1, Achszeilen)</label><input type="text" id="s-wheelkg" value="–" disabled></div>
+        </div>
+        <div class="note">Rotierende Massen: Ein Teil der Hangenergie geht in die Rotation der Räder statt in Vortrieb — die wirksame Trägheit ist m_eff = m + f·m_Räder (f = 1.0 für Masse konzentriert im Felgen-/Reifenring, realistisch bei Seifenkistenrädern; 0.5 für Vollscheibe). Die Masse wird aus den Zeilen "Achse + Räder vorne/hinten" (Tab 1) übernommen — die Achse selbst rotiert nicht mit; für maximale Genauigkeit dort nur die rotierende Masse (Felgen + Reifen) eintragen. Effekt: ~0.3–1 s auf 600 m, vor allem in der Beschleunigungsphase.</div>
+        <div class="note">µ und Bremsverzögerung wirken nur, wenn eine CSV mit Easting/Northing geladen wurde (liefert Kurvenradien). v_max pro Kurve = √(µ·g·Radius); die Bremsverzögerung bestimmt, wie früh vor eng werdenden Kurven abgebremst werden muss — hangabhängig korrigiert (bergab verlängert sich der Bremsweg, bergauf verkürzt er sich). µ≈0.4–0.6 ist ein grober Richtwert für Gummireifen auf Asphalt — reale Werte hängen stark von Reifen, Fahrkönnen und Fahrwerk ab.</div>
         <div class="note">Gefälle und mittlere Höhe (für die Luftdichte) werden automatisch aus Start-/Zielhöhe und Streckenlänge berechnet — siehe "Abgeleitete Werte" rechts. Das setzt eine konstante, gleichmässige Steigung voraus; bei einem gekrümmten Streckenprofil (steiler Start, flacherer Auslauf) ist das eine Vereinfachung.</div>
         <div class="note" id="curve-note">Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen (Fehlerwertung: 0.5s bei verschobenem Leitkegel, 10s bei verschobenem Strohballen oder ausgelassenem Tor). Ohne geladenes CSV-Höhenprofil mit Easting/Northing bildet diese Simulation nur die reine Geradeausfahrt ab — Kurvenverhalten ist dann nicht berücksichtigt.</div>
       </div>
@@ -397,9 +409,10 @@
         <div class="result-row"><span>Zielgeschwindigkeit</span><span class="v" id="e-vfinal">–</span></div>
         <div class="result-row"><span>Theoretische Terminalgeschwindigkeit</span><span class="v" id="e-vterm">–</span></div>
         <div class="result-row"><span>Verwendete Masse</span><span class="v" id="e-mass">–</span></div>
+        <div class="result-row"><span>Wirksame Trägheit (inkl. Radrotation)</span><span class="v" id="e-meff">–</span></div>
         <div class="result-row"><span>Verwendetes CdA</span><span class="v" id="e-cda">–</span></div>
         <div class="result-row"><span>Kurvenbremsung</span><span class="v" id="e-curve">–</span></div>
-        <div class="note">Werte werden live aus Tab 1–3 übernommen. Simulation nutzt Euler-Integration (Δt = 0.02 s) über Kräfte: Hangabtrieb, Rollwiderstand, Luftwiderstand.</div>
+        <div class="note">Werte werden live aus Tab 1–3 übernommen. Simulation nutzt Euler-Integration (Δt = 0.005 s) über Kräfte: Hangabtrieb, Rollwiderstand, Luftwiderstand — mit lokalem Gefälle und lokaler Luftdichte (Höhe) pro Streckenpunkt bei geladenem Profil, sowie wirksamer Trägheit inkl. rotierender Radmassen.</div>
       </div>
 
       <div class="card">
@@ -497,7 +510,10 @@ function getCogData(){
   const fahrerKg = fahrerRow ? fahrerRow.kg : 0;
   const kisteKg = totalKg - fahrerKg;
 
-  return {totalKg, cogPos, wb, wbWarning, frontPct, rearPct, fahrerKg, kisteKg};
+  // Rotierende Masse: Summe der beiden Achs-Zeilen ("Achse + Räder vorne/hinten")
+  const wheelKg = rows.filter(r => isAchse(r)).reduce((s,r)=>s+r.kg,0);
+
+  return {totalKg, cogPos, wb, wbWarning, frontPct, rearPct, fahrerKg, kisteKg, wheelKg};
 }
 
 function weightPenaltySeconds(kisteKg){
@@ -854,7 +870,7 @@ document.getElementById('track-import').addEventListener('change', (ev)=>{
   });
   document.getElementById(id).addEventListener('change', updateAll);
 });
-['s-crr','s-wind','s-temp','s-mu','s-brake'].forEach(id=>{
+['s-crr','s-wind','s-temp','s-mu','s-brake','s-rot'].forEach(id=>{
   document.getElementById(id).addEventListener('input', updateAll);
   document.getElementById(id).addEventListener('change', updateAll);
 });
@@ -878,6 +894,7 @@ function getStreckeData(){
   const temp = parseFloat(document.getElementById('s-temp').value)||15;
   const mu = parseFloat(document.getElementById('s-mu').value)||0.5;
   const brakeDecel = parseFloat(document.getElementById('s-brake').value)||3.0;
+  const rotFactor = parseFloat(document.getElementById('s-rot').value);
 
   const heightDrop = startHeight - endHeight;
   const slopePct = length>0 ? (heightDrop/length)*100 : 0;
@@ -890,11 +907,14 @@ function getStreckeData(){
   }
   const rho = airDensity(temp, altMean);
 
-  return {length, slopePct, crr, wind, temp, altMean, theta, rho, heightDrop, profile: currentProfile, curveLimits};
+  return {length, slopePct, crr, wind, temp, altMean, theta, rho, heightDrop, profile: currentProfile, curveLimits, rotFactor};
 }
 
 // Kurvengeschwindigkeits-Limit pro Profilpunkt: v_max = sqrt(µ·g·R), danach Rückwärtsglättung
 // gemäss max. Bremsverzögerung, damit vor engen Kurven rechtzeitig gebremst wird (analog Racing-Line-Speedprofilen).
+// Die Bremsverzögerung wird hangabhängig korrigiert: bergab wirkt die Hangabtriebskraft der Bremsung
+// entgegen (a_eff = brake − g·sin(θ), verlängert den Bremsweg), bergauf unterstützt sie ihn.
+// Untergrenze 0.5 m/s², damit bei sehr steilem Gefälle die Limits nicht entarten.
 function computeCurveSpeedLimits(profile, mu, brakeDecel){
   const g = 9.81;
   const n = profile.length;
@@ -906,7 +926,11 @@ function computeCurveSpeedLimits(profile, mu, brakeDecel){
   for(let i=n-2;i>=0;i--){
     const ds = profile[i+1][0]-profile[i][0];
     if(ds>0 && isFinite(limits[i+1])){
-      const achievable = Math.sqrt(limits[i+1]*limits[i+1] + 2*brakeDecel*ds);
+      // lokales Gefälle zwischen den Punkten (positiv = bergab)
+      const slope = (profile[i][1]-profile[i+1][1])/ds;
+      const theta = Math.atan(slope);
+      const aEff = Math.max(0.5, brakeDecel - g*Math.sin(theta));
+      const achievable = Math.sqrt(limits[i+1]*limits[i+1] + 2*aEff*ds);
       limits[i] = Math.min(limits[i], achievable);
     }
   }
@@ -916,7 +940,7 @@ function computeCurveSpeedLimits(profile, mu, brakeDecel){
 // ---------- Simulation ----------
 function localThetaFromProfile(profile, x, fallbackTheta){
   if(!profile || profile.length<2) return fallbackTheta;
-  // profile ist nach Distanz sortiert; einfache lineare Suche (Profile sind klein genug, <1000 Punkte)
+  // profile ist nach Distanz sortiert; lineare Suche (Profile sind klein genug, <1000 Punkte)
   let i = 0;
   while(i < profile.length-2 && profile[i+1][0] <= x) i++;
   const p0 = profile[i], p1 = profile[Math.min(i+1, profile.length-1)];
@@ -924,6 +948,18 @@ function localThetaFromProfile(profile, x, fallbackTheta){
   if(dist<=0) return fallbackTheta;
   const slope = (p0[1]-p1[1])/dist; // positiv = bergab
   return Math.atan(slope);
+}
+
+// Lokale Höhe an Position x (linear interpoliert) — für die höhenabhängige Luftdichte
+function localAltFromProfile(profile, x, fallbackAlt){
+  if(!profile || profile.length<2) return fallbackAlt;
+  let i = 0;
+  while(i < profile.length-2 && profile[i+1][0] <= x) i++;
+  const p0 = profile[i], p1 = profile[Math.min(i+1, profile.length-1)];
+  const d0 = p0[0], d1 = p1[0];
+  if(d1<=d0) return p0[1];
+  const t = (x-d0)/(d1-d0);
+  return p0[1] + t*(p1[1]-p0[1]);
 }
 
 function localLimitFromProfile(profile, limits, x){
@@ -937,20 +973,30 @@ function localLimitFromProfile(profile, limits, x){
   return l0 + t*(l1-l0);
 }
 
-function simulate(mass, cda, strecke){
+function simulate(mass, cda, strecke, wheelKg){
   const g = 9.81;
+  // Wirksame Trägheit inkl. rotierender Radmassen: m_eff = m + f·m_Räder.
+  // Trägheitskräfte (Hangabtrieb, Rollwiderstand) skalieren mit der echten Masse m,
+  // beschleunigt wird aber m_eff: a = F(m)/m_eff.
+  const rotF = strecke.rotFactor || 0;
+  const mEff = mass + rotF*(wheelKg||0);
+
   let v = 0, x = 0, t = 0;
-  const dt = 0.02;
+  const dt = 0.005; // feiner Zeitschritt: Integrationsfehler ~30 ms statt ~130 ms bei 0.02
   const track = [];
   let steps = 0;
-  while(x < strecke.length && steps < 200000){
+  const maxSteps = 800000;
+  while(x < strecke.length && steps < maxSteps){
     const theta = localThetaFromProfile(strecke.profile, x, strecke.theta);
+    const rho = strecke.profile
+      ? airDensity(strecke.temp, localAltFromProfile(strecke.profile, x, strecke.altMean))
+      : strecke.rho;
     const Fgrav = mass*g*Math.sin(theta);
     const Froll = strecke.crr*mass*g*Math.cos(theta);
     const vRel = v + strecke.wind; // Gegenwind erhöht relative Anströmgeschwindigkeit
-    const Fair = 0.5*strecke.rho*cda*vRel*Math.abs(vRel);
+    const Fair = 0.5*rho*cda*vRel*Math.abs(vRel);
     const Fnet = Fgrav - Froll - Fair;
-    const a = Fnet/mass;
+    const a = Fnet/mEff;
     v += a*dt;
     // Hinweis: negative Geschwindigkeit wird auf 0 geklemmt — die Kiste rollt an Gegensteigungen
     // NICHT zurück, sondern bleibt stehen (vereinfachende Annahme; für Bergab-Rennen unkritisch,
@@ -958,18 +1004,25 @@ function simulate(mass, cda, strecke){
     if(v<0) v=0;
     x += v*dt;
     if(strecke.curveLimits){
+      // Klemmung auf das lokale Kurvenlimit; mit dt=0.005 s ist der Diskretisierungsfehler
+      // beim Einbremsen in die Kurve vernachlässigbar (<1 cm Positionsfehler pro Schritt).
       const limit = localLimitFromProfile(strecke.profile, strecke.curveLimits, x);
-      if(v > limit) v = limit; // Bremsen vor/in der Kurve auf die zulässige Kurvengeschwindigkeit
+      if(v > limit){
+        v = limit;
+      }
     }
     t += dt;
     steps++;
-    if(steps % 5 === 0){
+    if(steps % 20 === 0){ // alle 0.1 s ein Track-Punkt (gleiche Dichte wie vorher: 0.02/5)
       const vRelFinal = v + strecke.wind;
-      const FairFinal = 0.5*strecke.rho*cda*vRelFinal*Math.abs(vRelFinal);
+      const rhoFinal = strecke.profile
+        ? airDensity(strecke.temp, localAltFromProfile(strecke.profile, x, strecke.altMean))
+        : strecke.rho;
+      const FairFinal = 0.5*rhoFinal*cda*vRelFinal*Math.abs(vRelFinal);
       track.push({x, v, Fair: FairFinal});
     }
   }
-  return {t, v, track};
+  return {t, v, track, mEff};
 }
 
 function terminalVelocity(mass, cda, strecke){
@@ -1248,7 +1301,7 @@ function updateAllNow(){
 
   const mass = cog.totalKg>0 ? cog.totalKg : 80;
   const cda = cw.cda>0 ? cw.cda : 0.3;
-  const sim = simulate(mass, cda, strecke);
+  const sim = simulate(mass, cda, strecke, cog.wheelKg);
   const vterm = terminalVelocity(mass, cda, strecke);
   const totalTime = sim.t + penalty;
 
@@ -1257,6 +1310,8 @@ function updateAllNow(){
   document.getElementById('e-vfinal').textContent = fmt(sim.v*3.6,1)+' km/h';
   document.getElementById('e-vterm').textContent = fmt(Math.max(vterm,0)*3.6,1)+' km/h';
   document.getElementById('e-mass').textContent = fmt(mass,1)+' kg';
+  document.getElementById('s-wheelkg').value = fmt(cog.wheelKg,1)+' kg (f='+fmt(strecke.rotFactor,1)+')';
+  document.getElementById('e-meff').textContent = fmt(sim.mEff,1)+' kg' + (sim.mEff>mass ? ` (+${fmt(sim.mEff-mass,1)} kg Radrotation)` : '');
   document.getElementById('e-cda').textContent = fmt(cda,3)+' m²';
 
   const curveActive = !!strecke.curveLimits;
