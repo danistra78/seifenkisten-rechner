@@ -655,8 +655,13 @@ function drawCogModel(cog){
       // Strichmännchen sitzend im ORIGINAL-Massstab (px pro cm = S, wie horizontal):
       // Körpergrösse aus Gewicht interpoliert (atlasrepos.ch). Sitzend ≈ 55% der
       // Körpergrösse über der Sitzfläche (Hüfte auf der Bodenplatten-Oberkante), Kopf oben.
+      // Beinlänge ≈ 55% der Körpergrösse (z.B. 74 cm bei 135 cm) — Oberschenkel und
+      // Unterschenkel je die Hälfte, sitzend nach vorne gestreckt.
       const bodyCm = heightFromWeight(r.kg);
       const seatedCm = bodyCm * 0.55;          // Sitzhöhe: Hüfte bis Scheitel
+      const legCm = bodyCm * 0.55;             // gesamtes Bein (Hüfte bis Fuss)
+      const thigh = legCm * 0.5 * S;           // Oberschenkel
+      const shin = legCm * 0.5 * S;            // Unterschenkel
       const hipY = seatY - 2;                  // sitzt AUF der Bodenplatte
       const torso = seatedCm * 0.68 * S;       // Rumpf+Kopf-Anteil
       const headR = seatedCm * 0.12 * S;       // Kopf
@@ -664,8 +669,16 @@ function drawCogModel(cog){
       mk('circle', {cx: mx, cy: headY, r: headR, fill:'none', stroke:'#1F2421', 'stroke-width':2});            // Kopf
       mk('line', {x1: mx, y1: hipY, x2: mx, y2: hipY-torso, stroke:'#1F2421', 'stroke-width':2});               // Rumpf
       mk('line', {x1: mx, y1: hipY-torso*0.85, x2: mx-seatedCm*0.25*S, y2: hipY-torso*0.55, stroke:'#1F2421', 'stroke-width':2}); // Arm nach vorne (Lenkung)
-      mk('line', {x1: mx, y1: hipY, x2: mx-seatedCm*0.22*S, y2: hipY-seatedCm*0.13*S, stroke:'#1F2421', 'stroke-width':2}); // Oberschenkel
-      mk('line', {x1: mx-seatedCm*0.22*S, y1: hipY-seatedCm*0.13*S, x2: mx-seatedCm*0.35*S, y2: hipY-seatedCm*0.03*S, stroke:'#1F2421', 'stroke-width':2}); // Unterschenkel
+      // Beine: Oberschenkel nach vorne, Knie, Unterschenkel zum Fuss auf dem Boden.
+      // Unterschenkel-Winkel so gewählt, dass die echte Länge erhalten bleibt (Fuss auf Boden).
+      const kneeX = mx - thigh*0.95;
+      const kneeY = Math.min(hipY + thigh*0.31, groundY-6);
+      const shinDy = Math.min(shin*0.45, groundY-2-kneeY);
+      const shinDx = Math.sqrt(Math.max(0, shin*shin - shinDy*shinDy));
+      const footX = kneeX - shinDx;
+      const footY = kneeY + shinDy;
+      mk('line', {x1: mx, y1: hipY, x2: kneeX, y2: kneeY, stroke:'#1F2421', 'stroke-width':2});                 // Oberschenkel
+      mk('line', {x1: kneeX, y1: kneeY, x2: footX, y2: footY, stroke:'#1F2421', 'stroke-width':2});             // Unterschenkel
       const badgeR = Math.max(6, headR*0.7);
       mk('circle', {cx: mx, cy: headY-headR-badgeR-2, r: badgeR, fill:'#C1440E'});
       mk('text', {x: mx, y: headY-headR-badgeR+1.5, 'font-size':10, fill:'#fff', 'text-anchor':'middle', 'font-weight':'bold'}, String(i+1));
