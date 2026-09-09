@@ -669,16 +669,27 @@ function drawCogModel(cog){
       mk('circle', {cx: mx, cy: headY, r: headR, fill:'none', stroke:'#1F2421', 'stroke-width':2});            // Kopf
       mk('line', {x1: mx, y1: hipY, x2: mx, y2: hipY-torso, stroke:'#1F2421', 'stroke-width':2});               // Rumpf
       mk('line', {x1: mx, y1: hipY-torso*0.85, x2: mx-seatedCm*0.25*S, y2: hipY-torso*0.55, stroke:'#1F2421', 'stroke-width':2}); // Arm nach vorne (Lenkung)
-      // Beine: Oberschenkel nach vorne, Knie, Unterschenkel zum Fuss auf dem Boden.
-      // Unterschenkel-Winkel so gewählt, dass die echte Länge erhalten bleibt (Fuss auf Boden).
-      const kneeX = mx - thigh*0.95;
-      const kneeY = Math.min(hipY + thigh*0.31, groundY-6);
-      const shinDy = Math.min(shin*0.45, groundY-2-kneeY);
-      const shinDx = Math.sqrt(Math.max(0, shin*shin - shinDy*shinDy));
-      const footX = kneeX - shinDx;
-      const footY = kneeY + shinDy;
+      // Beine: sitzend mit angewinkelten Knien — Füsse stehen auf der Bodenplatte,
+      // Knie nach oben/vorne. Zwei-Segment-IK: Fussziel vorn auf der Platte,
+      // Knie aus Oberschenkel-/Unterschenkellänge exakt berechnet (Längen bleiben erhalten).
+      const footX = mx - (thigh+shin)*0.72;
+      const footY = seatY;
+      let legDx = footX - mx, legDy = footY - hipY;
+      let D = Math.sqrt(legDx*legDx + legDy*legDy);
+      // D in den lösbaren Bereich clampen (leicht gestreckt bis leicht gebeugt)
+      D = Math.min(Math.max(D, Math.abs(thigh-shin)+2), thigh+shin-2);
+      const phi = Math.atan2(legDy, legDx);
+      const cosA = (thigh*thigh + D*D - shin*shin)/(2*thigh*D);
+      const A = Math.acos(Math.min(1, Math.max(-1, cosA)));
+      // Knie oberhalb der Hüfte-Fuss-Linie: Bildschirm-Y zeigt nach unten, Pilot blickt
+      // nach links (legDx<0) -> phi+A dreht das Knie nach oben; sonst phi-A.
+      const kneeAngle = legDx < 0 ? phi + A : phi - A;
+      const kneeX = mx + thigh*Math.cos(kneeAngle);
+      const kneeY = hipY + thigh*Math.sin(kneeAngle);
+      const footXe = mx + D*Math.cos(phi);          // Fuss-Endpunkt (bei Clamping korrigiert)
+      const footYe = hipY + D*Math.sin(phi);
       mk('line', {x1: mx, y1: hipY, x2: kneeX, y2: kneeY, stroke:'#1F2421', 'stroke-width':2});                 // Oberschenkel
-      mk('line', {x1: kneeX, y1: kneeY, x2: footX, y2: footY, stroke:'#1F2421', 'stroke-width':2});             // Unterschenkel
+      mk('line', {x1: kneeX, y1: kneeY, x2: footXe, y2: footYe, stroke:'#1F2421', 'stroke-width':2});           // Unterschenkel
       const badgeR = Math.max(6, headR*0.7);
       mk('circle', {cx: mx, cy: headY-headR-badgeR-2, r: badgeR, fill:'#C1440E'});
       mk('text', {x: mx, y: headY-headR-badgeR+1.5, 'font-size':10, fill:'#fff', 'text-anchor':'middle', 'font-weight':'bold'}, String(i+1));
