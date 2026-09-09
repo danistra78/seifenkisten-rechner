@@ -252,6 +252,7 @@
         </table>
         <button class="addrow" id="cog-add">+ Zeile hinzufügen</button>
         <div class="note">Der Radstand wird automatisch aus der Differenz der Positionen von "Achse + Räder vorne" und "Achse + Räder hinten" berechnet — die Zeilennamen müssen dafür "Achse", "vorne" bzw. "hinten" enthalten. Werden sie umbenannt oder gelöscht, siehst du unten eine Warnung.</div>
+        <div class="note">Besonderheit Bodenplatte: Dort wird die <b>gesamte Länge</b> eingetragen (ab Vorderachse, Position 0). Der Schwerpunkt der Platte wird automatisch in ihrer Mitte angenommen (Länge ÷ 2) — physikalisch korrekt für eine gleichmässige Platte. Im Modell unten wird sie als durchgehendes Brett gezeichnet.</div>
       </div>
 
       <div class="card sticky">
@@ -454,7 +455,7 @@ document.querySelectorAll('.tab-btn').forEach(btn=>{
 // ---------- Tab 1: Schwerpunkt ----------
 const cogDefaults = [
   ['Achse + Räder vorne', 5, 0],
-  ['Bodenplatte (Siebdruck 19mm gem. Reglement 4.2.3)', 10.3, 80],
+  ['Bodenplatte (Siebdruck 19mm gem. Reglement 4.2.3)', 10.3, 160],
   ['Karosserie vorne (Nase + Lenkung)', 12, 20],
   ['Karosserie Seitenteile (über ganze Länge)', 11.7, 90],
   ['Pilot:in', 35, 100],
@@ -491,10 +492,16 @@ document.getElementById('cog-add').addEventListener('click', ()=>{ addCogRow('Ne
 function getCogData(){
   const rows = [...cogBody.querySelectorAll('tr')].map(tr=>{
     const inputs = tr.querySelectorAll('input');
-    return { name: inputs[0].value, kg: parseFloat(inputs[1].value)||0, pos: parseFloat(inputs[2].value)||0 };
+    const name = inputs[0].value;
+    const kg = parseFloat(inputs[1].value)||0;
+    const pos = parseFloat(inputs[2].value)||0;
+    // Bodenplatte: eingetragener Wert ist die GESAMTLÄNGE ab Vorderachse (Position 0),
+    // ihr Schwerpunkt liegt in der Mitte -> wirksame Position = Länge/2.
+    const isPlate = name.toLowerCase().includes('bodenplatte');
+    return { name, kg, pos, effPos: isPlate ? pos/2 : pos, isPlate };
   });
   const totalKg = rows.reduce((s,r)=>s+r.kg,0);
-  const moment = rows.reduce((s,r)=>s+r.kg*r.pos,0);
+  const moment = rows.reduce((s,r)=>s+r.kg*r.effPos,0);
   const cogPos = totalKg>0 ? moment/totalKg : 0;
 
   // Radstand aus den Achs-Zeilen ableiten (Namen müssen "achse" + "vorne"/"hinten" enthalten)
@@ -578,7 +585,7 @@ function drawCogModel(cog){
   const av = rows.find(r => isAchse(r) && r.name.toLowerCase().includes('vorne'));
   const ah = rows.find(r => isAchse(r) && r.name.toLowerCase().includes('hinten'));
 
-  const positions = rows.map(r=>r.pos);
+  const positions = rows.flatMap(r=> r.isPlate ? [r.effPos, r.pos] : [r.effPos]);
   let cmMin = Math.min(0, ...positions) - 25;
   let cmMax = Math.max(cog.wb, ...positions) + 25;
   if(cmMax - cmMin < 50) cmMax = cmMin + 50;
@@ -620,8 +627,20 @@ function drawCogModel(cog){
   let colorIdx = 0;
 
   rows.forEach((r, i)=>{
-    const mx = X(r.pos);
+    const mx = X(r.effPos);
     const isPilot = r.name.trim().toLowerCase().startsWith('pilot');
+    if(r.isPlate){
+      // Bodenplatte: durchgehendes Brett von Position 0 bis zur eingetragenen Gesamtlänge
+      const x1 = X(0), x2 = X(r.pos);
+      const plateH = Math.max(3, 1.9*S); // 19 mm Siebdruck
+      mk('rect', {x: Math.min(x1,x2), y: bodyBottom-plateH, width: Math.abs(x2-x1), height: plateH,
+        fill:'#946B45', stroke:'#5B6058', 'stroke-width':1});
+      // Nummern-Badge über der Plattenmitte (= Schwerpunkt der Platte)
+      mk('line', {x1: mx, y1: bodyBottom-plateH-26, x2: mx, y2: bodyBottom-plateH, stroke:'#5B6058', 'stroke-width':1, 'stroke-dasharray':'2,2'});
+      mk('circle', {cx: mx, cy: bodyBottom-plateH-34, r: 8, fill:'#946B45'});
+      mk('text', {x: mx, y: bodyBottom-plateH-30.5, 'font-size':10, fill:'#fff', 'text-anchor':'middle', 'font-weight':'bold'}, String(i+1));
+      return;
+    }
     if(isPilot){
       // Strichmännchen sitzend im ORIGINAL-Massstab (px pro cm = S, wie horizontal):
       // Körpergrösse aus Gewicht interpoliert (atlasrepos.ch). Sitzend ≈ 55% der
@@ -659,7 +678,9 @@ function drawCogModel(cog){
   // Legende unter dem Modell
   const legend = document.getElementById('cog-legend');
   if(legend){
-    legend.textContent = rows.map((r,i)=>`${i+1}. ${r.name} (${fmt(r.kg,1)} kg @ ${fmt(r.pos,0)} cm)`).join(' · ');
+    legend.textContent = rows.map((r,i)=> r.isPlate
+      ? `${i+1}. ${r.name} (${fmt(r.kg,1)} kg, Länge ${fmt(r.pos,0)} cm → SP bei ${fmt(r.effPos,0)} cm)`
+      : `${i+1}. ${r.name} (${fmt(r.kg,1)} kg @ ${fmt(r.pos,0)} cm)`).join(' · ');
   }
 }
 
