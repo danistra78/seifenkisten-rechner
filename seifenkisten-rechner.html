@@ -604,12 +604,19 @@ function drawCogModel(cog){
   // Boden
   mk('line', {x1:10, y1:groundY, x2:W-10, y2:groundY, stroke:'#5B6058', 'stroke-width':2});
 
-  // Chassis: Kasten zwischen den Achsen + spitze Nase nach vorne
   const frontX = X(av ? av.pos : 0);
   const rearX = X(ah ? ah.pos : cog.wb);
-  mk('rect', {x: frontX-15, y: bodyTop, width: (rearX+12)-(frontX-15), height: bodyBottom-bodyTop,
+
+  // Chassis: Ausdehnung aus den KAROSSERIE-Komponenten (alle Zeilen außer Achsen),
+  // nicht aus den Radpositionen — die Räder dürfen unabhängig verschoben werden.
+  const bodyRows = rows.filter(r => !isAchse(r));
+  const bodyFrom = bodyRows.length ? Math.min(...bodyRows.map(r=>Math.min(r.effPos, r.isPlate ? 0 : r.effPos))) : 0;
+  const bodyTo = bodyRows.length ? Math.max(...bodyRows.map(r=>Math.max(r.effPos, r.isPlate ? r.pos : r.effPos))) : cog.wb;
+  const bodyX1 = X(bodyFrom), bodyX2 = X(bodyTo);
+  mk('rect', {x: bodyX1, y: bodyTop, width: Math.max(4, bodyX2-bodyX1), height: bodyBottom-bodyTop,
     fill:'#DAD5C6', stroke:'#5B6058', 'stroke-width':1.5});
-  mk('polygon', {points: `${frontX-15},${bodyTop} ${frontX-48},${bodyBottom-3} ${frontX-15},${bodyBottom}`,
+  // Spitze Nase nach vorne (vor der vordersten Karosserie-Komponente)
+  mk('polygon', {points: `${bodyX1},${bodyTop} ${Math.max(8, bodyX1-33)},${bodyBottom-3} ${bodyX1},${bodyBottom}`,
     fill:'#DAD5C6', stroke:'#5B6058', 'stroke-width':1.5});
 
   // Räder
@@ -630,7 +637,6 @@ function drawCogModel(cog){
   const plateRow = rows.find(r=>r.isPlate);
   const plateH = Math.max(3, 1.9*S); // 19 mm Siebdruck
   const seatY = plateRow ? bodyBottom - plateH : bodyBottom;
-
   rows.forEach((r, i)=>{
     const mx = X(r.effPos);
     const isPilot = r.name.trim().toLowerCase().startsWith('pilot');
