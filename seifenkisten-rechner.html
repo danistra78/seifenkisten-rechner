@@ -368,7 +368,7 @@
           <div class="field"><label>Lufttemperatur (°C)</label><input type="number" id="s-temp" value="15"></div>
         </div>
         <div class="fieldrow">
-          <div class="field"><label>Reifenhaftung µ (Kurvengrenze)</label><input type="number" id="s-mu" value="0.5" step="0.05"></div>
+          <div class="field"><label>Reifenhaftung µ (Kurvengrenze)</label><input type="number" id="s-mu" value="0.6" step="0.05"></div>
           <div class="field"><label>Max. Bremsverzögerung (m/s²)</label><input type="number" id="s-brake" value="3.0" step="0.5"></div>
         </div>
         <div class="fieldrow">
@@ -383,7 +383,7 @@
           <div class="field"><label>Rotierende Masse (aus Tab 1, Achszeilen)</label><input type="text" id="s-wheelkg" value="–" disabled></div>
         </div>
         <div class="note">Rotierende Massen: Ein Teil der Hangenergie geht in die Rotation der Räder statt in Vortrieb — die wirksame Trägheit ist m_eff = m + f·m_Räder (f = 1.0 für Masse konzentriert im Felgen-/Reifenring, realistisch bei Seifenkistenrädern; 0.5 für Vollscheibe). Die Masse wird aus den Zeilen "Achse + Räder vorne/hinten" (Tab 1) übernommen — die Achse selbst rotiert nicht mit; für maximale Genauigkeit dort nur die rotierende Masse (Felgen + Reifen) eintragen. Effekt: ~0.3–1 s auf 600 m, vor allem in der Beschleunigungsphase.</div>
-        <div class="note">µ und Bremsverzögerung wirken nur, wenn eine CSV mit Easting/Northing geladen wurde (liefert Kurvenradien). v_max pro Kurve = √(µ·g·Radius); die Bremsverzögerung bestimmt, wie früh vor eng werdenden Kurven abgebremst werden muss — hangabhängig korrigiert (bergab verlängert sich der Bremsweg, bergauf verkürzt er sich). µ≈0.4–0.6 ist ein grober Richtwert für Gummireifen auf Asphalt — reale Werte hängen stark von Reifen, Fahrkönnen und Fahrwerk ab.</div>
+        <div class="note">µ und Bremsverzögerung wirken nur, wenn eine CSV mit Easting/Northing geladen wurde (liefert Kurvenradien). v_max pro Kurve = √(µ·g·Radius); die Bremsverzögerung bestimmt, wie früh vor eng werdenden Kurven abgebremst werden muss — hangabhängig korrigiert (bergab verlängert sich der Bremsweg, bergauf verkürzt er sich). µ≈0.4–0.6 ist ein grober Richtwert für Gummireifen auf Asphalt — reale Werte hängen stark von Reifen, Fahrkönnen und Fahrwerk ab. Kalibrierung Rangliste Oetwil a.d.L. 2026: Die Spitze der Kategorie L (Siegerlauf 1:10.16 über 626 m) wird mit µ≈0.7 reproduziert — gute Reifen, hohe Hinterachslast in der Kurve und eine Linie, die den effektiven Radius vergrössert, liefern mehr Grip als der konservative Schätzwert.</div>
         <div class="note">Gefälle und mittlere Höhe (für die Luftdichte) werden automatisch aus Start-/Zielhöhe und Streckenlänge berechnet — siehe "Abgeleitete Werte" rechts. Das setzt eine konstante, gleichmässige Steigung voraus; bei einem gekrümmten Streckenprofil (steiler Start, flacherer Auslauf) ist das eine Vereinfachung.</div>
         <div class="note" id="curve-note">Gemäss Rennreglement (6.10.10) enthalten echte Strecken Schikanen/Tore mit Leitkegeln und Strohballen (Fehlerwertung: 0.5s bei verschobenem Leitkegel, 10s bei verschobenem Strohballen oder ausgelassenem Tor). Ohne geladenes CSV-Höhenprofil mit Easting/Northing bildet diese Simulation nur die reine Geradeausfahrt ab — Kurvenverhalten ist dann nicht berücksichtigt.</div>
       </div>
@@ -713,7 +713,7 @@ function applyTrackToForm(data){
     const radii = data.profile.map(p=>p[2]).filter(r=>r!==null && r!==undefined && isFinite(r));
     if(radii.length>0){
       const minR = Math.min(...radii);
-      const mu = parseFloat(document.getElementById('s-mu').value)||0.5;
+      const mu = parseFloat(document.getElementById('s-mu').value)||0.6;
       const vMax = Math.sqrt(mu*9.81*minR)*3.6;
       document.getElementById('track-curve').textContent = `${fmt(minR,1)} m (max. ~${fmt(vMax,0)} km/h bei µ=${mu})`;
       document.getElementById('track-status').textContent = `Strecke "${data.name}" geladen: vollständiges Höhenprofil (${data.profile.length} Pkt.) inkl. Kurvenradien. Schärfste Kurve: ${fmt(minR,1)}m Radius — Simulation berücksichtigt jetzt Bremsen vor engen Kurven.`;
@@ -892,7 +892,7 @@ function getStreckeData(){
   const crr = parseFloat(document.getElementById('s-crr').value)||0.005;
   const wind = parseFloat(document.getElementById('s-wind').value)||0;
   const temp = parseFloat(document.getElementById('s-temp').value)||15;
-  const mu = parseFloat(document.getElementById('s-mu').value)||0.5;
+  const mu = parseFloat(document.getElementById('s-mu').value)||0.6;
   const brakeDecel = parseFloat(document.getElementById('s-brake').value)||3.0;
   const rotFactor = parseFloat(document.getElementById('s-rot').value);
 
