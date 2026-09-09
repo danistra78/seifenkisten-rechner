@@ -276,7 +276,7 @@
       <h2>Seitenansicht — Modell aus den Komponentenpositionen</h2>
       <svg id="cog-model" viewBox="0 0 640 235" style="width:100%;height:235px;background:var(--paper);border:1px solid var(--grid);"></svg>
       <div class="note" id="cog-legend">–</div>
-      <div class="note">Vorne ist links (Position 0 = Vorderachse). Nummern = Zeilen der Tabelle oben, Strichmännchen = Pilot:in, rote Strichlinie = Gesamtschwerpunkt. Massestab horizontal = cm ab Vorderachse.</div>
+      <div class="note">Vorne ist links (Position 0 = Vorderachse). Nummern = Zeilen der Tabelle oben, Strichmännchen = Pilot:in (Grösse aus Gewicht interpoliert, Näherungswerte Kinder 1–17 J. gemäss atlasrepos.ch), rote Strichlinie = Gesamtschwerpunkt. Massestab horizontal = cm ab Vorderachse.</div>
     </div>
   </div>
 
@@ -534,6 +534,28 @@ function weightPenaltySeconds(kisteKg){
 // Vorne = links, Position 0 = Vorderachse, Massstab horizontal = cm.
 // Komponenten als nummerierte Marker (Höhen gestaffelt), Pilot:in als Strichmännchen,
 // Gesamtschwerpunkt als rote Strichlinie.
+
+// Näherungswerte Körpergrösse aus Gewicht (Kinder 1–17 Jahre), Quelle:
+// https://www.atlasrepos.ch/gewicht-kinder/ — Mittel aus Jungen/Mädchen, linear interpoliert,
+// ausserhalb der Grenzen geclampt. [kg, cm]
+const WEIGHT_TO_HEIGHT = [
+  [11, 82.5], [13.5, 92], [16, 100.5], [18, 107.5], [21, 114.5], [23.5, 121],
+  [26.5, 127], [30.5, 133], [34, 138.5], [38, 144], [43.5, 150.5], [48.5, 156],
+  [54, 162], [59.5, 167], [63, 170], [66, 171.5], [72, 178]
+];
+function heightFromWeight(kg){
+  const t = WEIGHT_TO_HEIGHT;
+  if(kg <= t[0][0]) return t[0][1];
+  if(kg >= t[t.length-1][0]) return t[t.length-1][1];
+  for(let i=0; i<t.length-1; i++){
+    if(kg >= t[i][0] && kg <= t[i+1][0]){
+      const f = (kg - t[i][0]) / (t[i+1][0] - t[i][0]);
+      return t[i][1] + f*(t[i+1][1] - t[i][1]);
+    }
+  }
+  return 138.5;
+}
+
 function drawCogModel(cog){
   const svg = document.getElementById('cog-model');
   if(!svg) return;
@@ -594,16 +616,24 @@ function drawCogModel(cog){
     const mx = X(r.pos);
     const isPilot = r.name.trim().toLowerCase().startsWith('pilot');
     if(isPilot){
-      // Strichmännchen sitzend: vorne ist links -> Blick nach links
+      // Strichmännchen sitzend: vorne ist links -> Blick nach links.
+      // Grösse aus Gewicht interpoliert (Näherungswerte Kinder 1-17 J., atlasrepos.ch);
+      // Referenz: 35 kg ≈ 138.5 cm entspricht der Standardzeichnung (scale=1).
+      const bodyCm = heightFromWeight(r.kg);
+      const scale = Math.max(0.35, Math.min(1.35, bodyCm/138.5));
       const hipY = bodyTop - 2;
-      const headY = hipY - 40;
-      mk('circle', {cx: mx, cy: headY, r: 7, fill:'none', stroke:'#1F2421', 'stroke-width':2});          // Kopf
-      mk('line', {x1: mx, y1: hipY, x2: mx, y2: hipY-33, stroke:'#1F2421', 'stroke-width':2});              // Rumpf
-      mk('line', {x1: mx, y1: hipY-28, x2: mx-14, y2: hipY-18, stroke:'#1F2421', 'stroke-width':2});        // Arm nach vorne (Lenkung)
-      mk('line', {x1: mx, y1: hipY, x2: mx-10, y2: hipY-9, stroke:'#1F2421', 'stroke-width':2});            // Oberschenkel
-      mk('line', {x1: mx-10, y1: hipY-9, x2: mx-17, y2: hipY-2, stroke:'#1F2421', 'stroke-width':2});       // Unterschenkel
-      mk('circle', {cx: mx, cy: headY-16, r: 8, fill:'#C1440E'});
-      mk('text', {x: mx, y: headY-12.5, 'font-size':10, fill:'#fff', 'text-anchor':'middle', 'font-weight':'bold'}, String(i+1));
+      const torso = 33*scale;
+      const headR = 7*scale;
+      const headY = hipY - torso - headR;
+      mk('circle', {cx: mx, cy: headY, r: headR, fill:'none', stroke:'#1F2421', 'stroke-width':2});            // Kopf
+      mk('line', {x1: mx, y1: hipY, x2: mx, y2: hipY-torso, stroke:'#1F2421', 'stroke-width':2});               // Rumpf
+      mk('line', {x1: mx, y1: hipY-torso*0.85, x2: mx-14*scale, y2: hipY-torso*0.55, stroke:'#1F2421', 'stroke-width':2}); // Arm nach vorne (Lenkung)
+      mk('line', {x1: mx, y1: hipY, x2: mx-10*scale, y2: hipY-9*scale, stroke:'#1F2421', 'stroke-width':2});    // Oberschenkel
+      mk('line', {x1: mx-10*scale, y1: hipY-9*scale, x2: mx-17*scale, y2: hipY-2, stroke:'#1F2421', 'stroke-width':2}); // Unterschenkel
+      mk('circle', {cx: mx, cy: headY-headR-9*scale, r: 8, fill:'#C1440E'});
+      mk('text', {x: mx, y: headY-headR-9*scale+3.5, 'font-size':10, fill:'#fff', 'text-anchor':'middle', 'font-weight':'bold'}, String(i+1));
+      // Grössen-Annotation neben dem Kopf
+      mk('text', {x: mx+14*scale, y: headY, 'font-size':9, fill:'#5B6058'}, `≈${fmt(bodyCm,0)} cm`);
     } else {
       const markerY = bodyTop - 34 - (i%4)*20;
       mk('line', {x1: mx, y1: markerY+8, x2: mx, y2: bodyTop-2, stroke:'#5B6058', 'stroke-width':1, 'stroke-dasharray':'2,2'});
