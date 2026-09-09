@@ -626,13 +626,17 @@ function drawCogModel(cog){
   const palette = ['#2B6777','#4B7447','#946B45','#7B2D8B','#0F7B6C','#B5651D','#5B6058','#8B0000'];
   let colorIdx = 0;
 
+  // Oberkante der Bodenplatte (Sitzfläche für das Strichmännchen)
+  const plateRow = rows.find(r=>r.isPlate);
+  const plateH = Math.max(3, 1.9*S); // 19 mm Siebdruck
+  const seatY = plateRow ? bodyBottom - plateH : bodyBottom;
+
   rows.forEach((r, i)=>{
     const mx = X(r.effPos);
     const isPilot = r.name.trim().toLowerCase().startsWith('pilot');
     if(r.isPlate){
       // Bodenplatte: durchgehendes Brett von Position 0 bis zur eingetragenen Gesamtlänge
       const x1 = X(0), x2 = X(r.pos);
-      const plateH = Math.max(3, 1.9*S); // 19 mm Siebdruck
       mk('rect', {x: Math.min(x1,x2), y: bodyBottom-plateH, width: Math.abs(x2-x1), height: plateH,
         fill:'#946B45', stroke:'#5B6058', 'stroke-width':1});
       // Nummern-Badge über der Plattenmitte (= Schwerpunkt der Platte)
@@ -644,10 +648,10 @@ function drawCogModel(cog){
     if(isPilot){
       // Strichmännchen sitzend im ORIGINAL-Massstab (px pro cm = S, wie horizontal):
       // Körpergrösse aus Gewicht interpoliert (atlasrepos.ch). Sitzend ≈ 55% der
-      // Körpergrösse über der Sitzfläche (Hüfte auf bodyTop), Kopf oben.
+      // Körpergrösse über der Sitzfläche (Hüfte auf der Bodenplatten-Oberkante), Kopf oben.
       const bodyCm = heightFromWeight(r.kg);
       const seatedCm = bodyCm * 0.55;          // Sitzhöhe: Hüfte bis Scheitel
-      const hipY = bodyTop - 2;
+      const hipY = seatY - 2;                  // sitzt AUF der Bodenplatte
       const torso = seatedCm * 0.68 * S;       // Rumpf+Kopf-Anteil
       const headR = seatedCm * 0.12 * S;       // Kopf
       const headY = hipY - torso - headR;
