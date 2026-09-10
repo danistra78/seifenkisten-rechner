@@ -120,6 +120,9 @@
     border-bottom:1px solid var(--grid);
   }
   .card.sticky{position:sticky; top:20px;}
+  /* Mobile: Grid faellt auf eine Spalte — die pinnende Karte wuerde dann
+     die Diagramme der Folge-Karten verdecken (scrollt unter ihr durch). */
+  @media(max-width:760px){ .card.sticky{position:static;} }
 
   table.rows{width:100%; border-collapse:collapse; font-size:13px;}
   table.rows th{
